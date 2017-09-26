@@ -1,0 +1,17 @@
+{
+    "dependencies": 
+    [
+        {
+            "name": "gtest",
+            "type": "git",
+            "url": "https://github.com/google/googletest.git",
+            "ref": "release-1.8.0"
+        },
+        {
+            "name": "cubeb",
+            "type": "git",
+            "url": "https://github.com/kinetiknz/cubeb.git",
+            "ref": "master"
+        }
+    ]
+}
