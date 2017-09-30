@@ -11,7 +11,10 @@ find_library(GMOCK_LIBRARY NAMES gmock)
 find_library(CUBEB_LIBRARY NAMES cubeb)
 
 # Source files
-file(GLOB_RECURSE SOUNDSTONE_SOURCE_FILES "./src/*.cpp" "./include/soundstone/*.hpp")
+file(GLOB_RECURSE SOUNDSTONE_SOURCE_FILES
+    "./src/*.cpp" "./src/*.hpp"
+    "./include/soundstone/*.hpp" "./include/soundstone_internal/*.hpp"
+)
 file(GLOB_RECURSE SOUNDSTONE_TEST_SOURCE_FILES "./test/*")
 
 # Targets
@@ -21,7 +24,7 @@ add_executable(soundstone_test ${SOUNDSTONE_TEST_SOURCE_FILES})
 
 # Pre-define SOUNDSTONE_TESTABLE_EXPORT so testable exports aren't exported for
 # main target.
-target_compile_definitions(soundstone PRIVATE SOUNDSTONE_TESTABLE_EXPORT)
+target_compile_definitions(soundstone PRIVATE SOUNDSTONE_TESTABLE_EXPORT=)
 
 generate_export_header(soundstone
     BASE_NAME SOUNDSTONE
