@@ -1,10 +1,11 @@
 #pragma once
 #include "Sampler.hpp"
 #include "SamplerWorker.hpp"
+#include <soundstone/RingBuffer.hpp>
+#include <cubeb/cubeb.h>
 #include <vector>
 #include <thread>
-#include <cubeb/cubeb.h>
-#include <soundstone/RingBuffer.hpp>
+#include <mutex>
 
 namespace soundstone {
     class SoundSystem {

@@ -1,8 +1,10 @@
 #pragma once
 #include "Sampler.hpp"
-#include <thread>
 #include <cstddef>
 #include <vector>
+#include <condition_variable>
+#include <mutex>
+
 
 namespace soundstone {
 
