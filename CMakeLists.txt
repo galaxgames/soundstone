@@ -6,9 +6,9 @@ include(CMakePackageConfigHelpers)
 
 enable_testing()
 find_package(GTest REQUIRED)
-# find_package(cubeb REQUIRED)
+find_package(cubeb CONFIG REQUIRED)
 find_library(GMOCK_LIBRARY NAMES gmock)
-find_library(CUBEB_LIBRARY NAMES cubeb)
+# find_library(CUBEB_LIBRARY NAMES cubeb)
 
 # Source files
 file(GLOB_RECURSE SOUNDSTONE_SOURCE_FILES
@@ -68,8 +68,8 @@ target_include_directories(soundstone_test
         $<BUILD_INTERFACE:${CMAKE_PREFIX_PATH}/include>
 )
 
-target_link_libraries(soundstone ${CUBEB_LIBRARY})
-target_link_libraries(soundstone_testable ${CUBEB_LIBRARY})
+target_link_libraries(soundstone cubeb::cubeb)
+target_link_libraries(soundstone_testable cubeb::cubeb)
 target_link_libraries(soundstone_test
     GTest::GTest GTest::Main ${GMOCK_LIBRARY} soundstone_testable
 )

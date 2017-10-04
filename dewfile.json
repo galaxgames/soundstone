@@ -10,8 +10,8 @@
         {
             "name": "cubeb",
             "type": "git",
-            "url": "https://github.com/kinetiknz/cubeb.git",
-            "ref": "master"
+            "url": "https://github.com/sfuller/cubeb.git",
+            "ref": "cmake-export-targets"
         }
     ]
 }
