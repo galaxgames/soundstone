@@ -10,6 +10,7 @@ namespace soundstone_example {
     public:
         SquareSampler(float frequency);
         void setup(unsigned int sample_rate) override;
+        void commit() override;
         size_t sample(float *data, size_t nsamples) override;
         void set_amplitude(float amplitude);
     };

@@ -12,6 +12,7 @@ namespace soundstone_example {
     public:
         SinewaveSampler(unsigned int frequency);
         void setup(unsigned int sample_rate) override;
+        void commit() override;
         size_t sample(float *data, size_t nsamples) override;
     };
 }

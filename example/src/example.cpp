@@ -1,4 +1,5 @@
 #include <soundstone/SoundSystem.hpp>
+#include <soundstone/RealTimeSoundSystemManager.hpp>
 #include "SinewaveSampler.hpp"
 #include "SquareSampler.hpp"
 #include <thread>
@@ -14,59 +15,42 @@ typedef chrono::duration<double> dseconds;
 
 int main(int argc, char **argv) {
     SoundSystem system;
-    SinewaveSampler sampler(440);
-    SquareSampler square(440);
-    system.add_sampler(&sampler);
-    system.add_sampler(&square);
+    SinewaveSampler sampler1(540);
+    SinewaveSampler sampler2(440);
+    SinewaveSampler sampler3(340);
+    SinewaveSampler sampler4(240);
+    SquareSampler square1(540);
+    SquareSampler square2(440);
+    SquareSampler square3(340);
+    SquareSampler square4(240);
+    system.add_sampler(&sampler1);
+    system.add_sampler(&sampler2);
+    system.add_sampler(&sampler3);
+    system.add_sampler(&sampler4);
+    system.add_sampler(&square1);
+    system.add_sampler(&square2);
+    system.add_sampler(&square3);
+    system.add_sampler(&square4);
+
     system.set_thread_count(4);
+    RealTimeSoundSystemManager manager(&system);
+
+    system.update(1024);
 
     chrono::high_resolution_clock::time_point frame_start = chrono::high_resolution_clock::now();
 
-    system.update(1024);
     for (;;) {
-        // Begining of frame
-        //frame_start = chrono::high_resolution_clock::now();
-
-        auto now = chrono::high_resolution_clock::now();
-        square.set_amplitude(sin(chrono::duration_cast<dseconds>(now.time_since_epoch()).count()));
-
+        auto since_epoch = chrono::duration_cast<dseconds>(frame_start.time_since_epoch());
+        square1.set_amplitude(sin(since_epoch.count()));
 
         // Simulate processing logic on main frame
         this_thread::sleep_for(chrono::duration<int, milli>(10));
 
-        now = chrono::high_resolution_clock::now();
+        auto now = chrono::high_resolution_clock::now();
         auto frame_duration = now - frame_start;
         frame_start = now;
         auto frame_duration_seconds = chrono::duration_cast<dseconds>(frame_duration);
-
-        double samples = static_cast<double>(system.sample_rate()) * frame_duration_seconds.count();
-        size_t nsamples = static_cast<size_t>(samples);
-
-        bool sample_count_changed = false;
-
-        size_t samples_buffered = system.samples_buffered();
-        size_t min_samples_target = size_t(44100) / size_t(60);
-        size_t max_samples_target = (size_t(44100) / size_t(60)) * 8;
-        if (nsamples + samples_buffered < min_samples_target) {
-            cout << "Increasing sample count from " << nsamples;
-            nsamples = min_samples_target - samples_buffered;
-            cout << " to " << nsamples;
-            sample_count_changed = true;
-
-        }
-        else if (nsamples + samples_buffered > max_samples_target) {
-            cout << "Descreasing sample count from " << nsamples;
-            nsamples = max_samples_target - samples_buffered;
-            cout << " to " << nsamples;
-            sample_count_changed = true;
-        }
-
-        system.update(nsamples);
-
-        if (sample_count_changed) {
-            cout << " update sample count: " << nsamples << ", buffer size: " << system.samples_buffered() << endl;
-        }
-
+        manager.update(frame_duration_seconds.count());
     }
 
 }

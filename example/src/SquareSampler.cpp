@@ -14,6 +14,10 @@ void SquareSampler::setup(unsigned int sample_rate) {
     _samples_per_cycle = sample_rate / static_cast<unsigned int>(_frequency);
 }
 
+void SquareSampler::commit() {
+
+}
+
 size_t SquareSampler::sample(float *data, size_t nsamples) {
     for (size_t i = 0; i < nsamples; ++i) {
         data[i] = ((_i / (_samples_per_cycle / 2)) % 2 ? 1.0f : -1.0f) * _amplitude;

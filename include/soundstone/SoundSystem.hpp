@@ -1,27 +1,36 @@
 #pragma once
+#include "Sampler.hpp"
+#include "SamplerWorker.hpp"
 #include <vector>
 #include <thread>
-#include "Sampler.hpp"
 #include <cubeb/cubeb.h>
 #include <soundstone/RingBuffer.hpp>
 
 namespace soundstone {
     class SoundSystem {
 
+        // Moveable primitives
         cubeb *_cubeb;
         cubeb_stream *_stream;
-        cubeb_state _state;
-        size_t _thread_count;
 
+        // Copyable primitives
+        cubeb_state _state;
         unsigned int _sample_rate;
         unsigned int _latency;
+        size_t _sampler_buffer_length;
+
         std::vector<Sampler *> _samplers;
+        std::vector<std::unique_ptr<SamplerWorker>> _workers;
+        std::vector<std::thread> _threads;
+        std::vector<std::unique_ptr<float[]>> _sampler_buffers;
+        Semaphore _semaphore;
         RingBuffer<float> _data;
         std::mutex _data_mutex;
 
         void move_internal(SoundSystem &&other) noexcept;
         bool init_cubeb();
         void destroy_cubeb();
+        void setup_workers(size_t count);
 
         static long data_callback(
             cubeb_stream *stream, void *user_ptr, void const *input_buffer,
@@ -32,12 +41,6 @@ namespace soundstone {
             cubeb_stream *stream, void *user_ptr, cubeb_state state
         );
 
-        /**
-         * @brief mix Mix stream b into stream a
-         * @param a
-         * @param b
-         * @param size
-         */
         void mix(float *a, const float *b, size_t size);
 
     public:
@@ -58,6 +61,5 @@ namespace soundstone {
         void remove_sampler(Sampler *sampler);
         void update(size_t nsamples);
         void set_thread_count(size_t count);
-
     };
 }

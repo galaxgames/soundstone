@@ -22,6 +22,10 @@ void SinewaveSampler::setup(unsigned int sample_rate) {
     }
 }
 
+void SinewaveSampler::commit() {
+
+}
+
 size_t SinewaveSampler::sample(float *data, size_t nsamples) {
     for (size_t i = 0; i < nsamples; ++i) {
         data[i] = _samples[_i];
