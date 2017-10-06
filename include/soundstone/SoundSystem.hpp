@@ -6,8 +6,11 @@
 #include <vector>
 #include <thread>
 #include <mutex>
+#include <unordered_set>
 
 namespace soundstone {
+
+
     class SoundSystem {
 
         // Moveable primitives
@@ -21,6 +24,8 @@ namespace soundstone {
         size_t _sampler_buffer_length;
 
         std::vector<Sampler *> _samplers;
+        std::unordered_set<Sampler *> _sampler_set;
+
         std::vector<std::unique_ptr<SamplerWorker>> _workers;
         std::vector<std::thread> _threads;
         std::vector<std::unique_ptr<float[]>> _sampler_buffers;
