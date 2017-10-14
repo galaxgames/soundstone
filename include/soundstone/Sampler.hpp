@@ -23,11 +23,20 @@ namespace soundstone {
 
         /**
          * @brief sample Generate samples
-         * @param data     Buffer to place generated sample data into.
-         * @param nsamples Length of the given buffer.
-         * @return         The count of samples actually generated.
+         * @param input_buffers Data from samplers routed to output to this
+         *                      sampler.
+         * @param output_buffer Buffer to sample to.
+         * @param input_count   The count of buffers the input_buffers
+         *                      parameter points to.
+         * @param nsamples      Length of the given buffers.
+         * @return              The count of samples actually generated.
          */
-        virtual size_t sample(float *data, size_t nsamples) = 0;
+        virtual size_t sample(
+            const float **input_buffers,
+            float *output_buffer,
+            size_t input_count,
+            size_t nsamples
+        ) = 0;
     };
 
 }

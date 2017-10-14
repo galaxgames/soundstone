@@ -6,6 +6,11 @@ namespace soundstone_test {
     public:
         void setup(unsigned int sample_rate) override;
         void commit() override;
-        size_t sample(float *data, size_t nsamples) override;
+        size_t sample(
+            const float **input_data,
+            float *output_data,
+            size_t input_count,
+            size_t nsamples
+        ) override;
     };
 }

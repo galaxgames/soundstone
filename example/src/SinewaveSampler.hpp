@@ -10,9 +10,14 @@ namespace soundstone_example {
         std::unique_ptr<float[]> _samples;
 
     public:
-        SinewaveSampler(unsigned int frequency);
+        explicit SinewaveSampler(unsigned int frequency);
         void setup(unsigned int sample_rate) override;
         void commit() override;
-        size_t sample(float *data, size_t nsamples) override;
+        size_t sample(
+            const float **input_data,
+            float *output_data,
+            size_t input_count,
+            size_t nsamples
+        ) override;
     };
 }

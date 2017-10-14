@@ -26,9 +26,14 @@ void SinewaveSampler::commit() {
 
 }
 
-size_t SinewaveSampler::sample(float *data, size_t nsamples) {
+size_t SinewaveSampler::sample(
+    const float **input_data,
+    float *output_data,
+    size_t input_count,
+    size_t nsamples
+) {
     for (size_t i = 0; i < nsamples; ++i) {
-        data[i] = _samples[_i];
+        output_data[i] = _samples[_i];
         _i = (_i + 1) % _samples_per_cycle;
     }
     return nsamples;

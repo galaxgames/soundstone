@@ -18,9 +18,14 @@ void SquareSampler::commit() {
 
 }
 
-size_t SquareSampler::sample(float *data, size_t nsamples) {
+size_t SquareSampler::sample(
+    const float **input_data,
+    float *output_data,
+    size_t input_count,
+    size_t nsamples
+) {
     for (size_t i = 0; i < nsamples; ++i) {
-        data[i] = ((_i / (_samples_per_cycle / 2)) % 2 ? 1.0f : -1.0f) * _amplitude;
+        output_data[i] = ((_i / (_samples_per_cycle / 2)) % 2 ? 1.0f : -1.0f) * _amplitude;
         _i = (_i + 1) % _samples_per_cycle;
     }
     return nsamples;

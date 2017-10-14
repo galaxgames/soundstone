@@ -13,6 +13,7 @@ SoundSystem::SoundSystem() {
     _stream = nullptr;
     _state = CUBEB_STATE_ERROR;
     _sampler_buffer_length = 0;
+    _is_graph_dirty = true;
     if (!init_cubeb()) {
         destroy_cubeb();
     }
@@ -156,9 +157,19 @@ unsigned int SoundSystem::sample_rate() const {
 
 void SoundSystem::add_sampler(Sampler *sampler) {
     _samplers.push_back(sampler);
-    unique_ptr<float[]> buffer(new float[_sampler_buffer_length]);
-    _sampler_buffers.emplace_back(move(buffer));
     sampler->setup(_sample_rate);
+    _sampler_graph.add(sampler);
+    _is_graph_dirty = true;
+}
+
+void SoundSystem::route_sampler(Sampler *sampler, Sampler *target) {
+    _sampler_graph.set_parent(target, sampler);
+    _is_graph_dirty = true;
+}
+
+void SoundSystem::route_sampler_to_root(Sampler *sampler) {
+    _sampler_graph.attach_to_root(sampler);
+    _is_graph_dirty = true;
 }
 
 void SoundSystem::remove_sampler(Sampler *sampler) {
@@ -167,16 +178,26 @@ void SoundSystem::remove_sampler(Sampler *sampler) {
         if (other == sampler) {
             long it_offset = static_cast<long>(i);
             _samplers.erase(_samplers.begin() + it_offset);
-            _sampler_buffers.erase(_sampler_buffers.begin() + it_offset);
         }
     }
+    // TODO: Remove from sampler graph
 }
 
 void SoundSystem::update(size_t nsamples) {
+    // Early out if we have no root samplers
+    if (_sampler_graph.root().inputs.empty()) {
+        return;
+    }
+
+    if (_is_graph_dirty) {
+        _sampler_graph.build(_ordered_samplers);
+        _is_graph_dirty = false;
+    }
+
     size_t sampler_count = _samplers.size();
     size_t worker_count = _workers.size();
 
-    // Make sure sampler buffers are big enough
+    // Make sure existing sampler buffers are big enough
     if (_sampler_buffer_length < nsamples) {
         for (unique_ptr<float[]> &buffer : _sampler_buffers) {
             buffer = unique_ptr<float[]>(new float[nsamples]);
@@ -184,34 +205,89 @@ void SoundSystem::update(size_t nsamples) {
         _sampler_buffer_length = nsamples;
     }
 
+    // Create ordered sampler queue
+    vector<const GraphNode<Sampler> *> ordered_samplers;
+    vector<const GraphNode<Sampler> *> ready_samplers;
+    ordered_samplers.insert(ordered_samplers.end(), _ordered_samplers.begin(), _ordered_samplers.end());
+
+    // Create new buffers if needed
+    while (_sampler_buffers.size() < ordered_samplers.size()) {
+        _sampler_buffers.emplace_back(new float[nsamples]);
+    }
+
     // Notify all samplers to commit settings
     for (size_t i = 0; i < sampler_count; ++i) {
         _samplers[i]->commit();
     }
 
-    // Distribute work to workers
-    size_t worker_load = sampler_count / worker_count;
-    size_t remainder = sampler_count % worker_count;
-    size_t next_worker_sampler_offset = 0;
+//
+//    // Distribute work to workers
+//    size_t worker_load = sampler_count / worker_count;
+//    size_t remainder = sampler_count % worker_count;
+//    size_t next_worker_sampler_offset = 0;
+//
+//    for (size_t i = 0; i < _workers.size(); ++i) {
+//        size_t worker_sampler_count = worker_load + (i < remainder ? 1 : 0);
+//        unique_ptr<SamplerWorker> &worker = _workers[i];
+//        Sampler **samplers = _samplers.data() + next_worker_sampler_offset;
+//
+//        // TODO: Re-use this vector or use a stack-allocated vla
+//        std::vector<float *> buffers;
+//        buffers.reserve(worker_sampler_count);
+//        for (size_t j = 0; j < worker_sampler_count; ++j) {
+//            unique_ptr<float[]> &buffer = _sampler_buffers[next_worker_sampler_offset + j];
+//            buffers.push_back(buffer.get());
+//        }
+//
+//        worker->setup(buffers.data(), samplers,  nsamples, worker_sampler_count, &_semaphore);
+//        next_worker_sampler_offset += worker_sampler_count;
+//    }
 
-    for (size_t i = 0; i < _workers.size(); ++i) {
-        size_t worker_sampler_count = worker_load + (i < remainder ? 1 : 0);
-        unique_ptr<SamplerWorker> &worker = _workers[i];
-        Sampler **samplers = _samplers.data() + next_worker_sampler_offset;
+    for (unique_ptr<SamplerWorker> &worker : _workers) {
+        worker->reset();
+        _semaphore.return_worker(worker.get());
+    }
+    for (;;) {
+        SamplerWorker *worker = _semaphore.wait();
 
-        // TODO: Re-use this vector or use a stack-allocated vla
-        std::vector<float *> buffers;
-        buffers.reserve(worker_sampler_count);
-        for (size_t j = 0; j < worker_sampler_count; ++j) {
-            unique_ptr<float[]> &buffer = _sampler_buffers[next_worker_sampler_offset + j];
-            buffers.push_back(buffer.get());
+        if (ready_samplers.empty()) {
+            // Figure out what samplers to work on next
+            bool is_finished = true;
+            for (const GraphNode<Sampler> *node : ordered_samplers) {
+                if (node == nullptr) {
+                    continue;
+                }
+                is_finished = false;
+                int dependency_index = node->dependency_index;
+                if (dependency_index == -1 || ordered_samplers[dependency_index] == nullptr) {
+                    // Dependency met, this node is ready
+                    ready_samplers.push_back(node);
+                    ordered_samplers[node->order_list_index] = nullptr;
+                }
+            }
+
+            if (is_finished) {
+                break;
+            }
+        }
+        if (!ready_samplers.empty()) {
+            const GraphNode<Sampler> *node = ready_samplers.back();
+            ready_samplers.pop_back();
+
+            size_t input_count = node->inputs.size();
+            unique_ptr<const float *[]> input_buffers(new const float *[input_count]);
+            for (size_t i = 0; i < input_count; ++i) {
+                const GraphNode<Sampler> *input_node = node->inputs[i];
+                input_buffers[i] = _sampler_buffers[input_node->order_list_index].get();
+            }
+            float *output_buffer = _sampler_buffers[node->order_list_index].get();
+            worker->setup(input_buffers.get(), output_buffer, node, input_count, nsamples, &_semaphore);
         }
 
-        worker->setup(buffers.data(), samplers,  nsamples, worker_sampler_count, &_semaphore);
-        next_worker_sampler_offset += worker_sampler_count;
     }
 
-    size_t workers_finished = 0;
+    // Wait for the remaining workers to finish
+    size_t workers_finished = 1;
     while(workers_finished < worker_count) {
         _semaphore.wait();
         ++workers_finished;
@@ -222,9 +298,12 @@ void SoundSystem::update(size_t nsamples) {
     // Note: Even this could be parallized, but it's not that big of a deal
     // since the number of buffers that needs to be mixed is only equal to the
     // thread count. So yeah, not sure if it would be efficient or not.
-    float *accumulator_buffer = _workers[0]->mixed_buffer();
-    for (size_t i = 1; i < worker_count; ++i) {
-        mix(accumulator_buffer, _workers[i]->mixed_buffer(), nsamples);
+    const GraphNode<Sampler> &root = _sampler_graph.root();
+    float *accumulator_buffer = _sampler_buffers[root.inputs[0]->order_list_index].get();
+    for (size_t i = 1, ilen = root.inputs.size(); i < ilen; ++i) {
+        const GraphNode<Sampler> *right_node = root.inputs[i];
+        float *right_buffer = _sampler_buffers[right_node->order_list_index].get();
+        mix(accumulator_buffer, right_buffer, nsamples);
     }
 
     // Submit the final mix to the ringbuffer to be consumed by cubeb.
@@ -240,8 +319,6 @@ void SoundSystem::update(size_t nsamples) {
     ) {
         cubeb_stream_start(_stream);
     }
-
-    //cout << "Goodbye semapohre " << &semaphore << endl;
 }
 
 void SoundSystem::set_thread_count(size_t count) {

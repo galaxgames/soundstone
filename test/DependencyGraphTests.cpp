@@ -1,16 +1,10 @@
 #include <soundstone/DependencyGraph.hpp>
 #include <gtest/gtest.h>
-#include "DumbSampler.hpp"
+#include "util/DumbSampler.hpp"
 
 using namespace soundstone;
 using namespace soundstone_test;
 using namespace std;
-
-TEST(DependencyGraphTest, InitialOrderFrontIsNull)
-{
-    DependencyGraph<Sampler> graph;
-    ASSERT_EQ(nullptr, graph.order());
-}
 
 TEST(DependencyGraphTest, TestBuiltWithNoNodesAttachedToRoot)
 {
@@ -19,9 +13,9 @@ TEST(DependencyGraphTest, TestBuiltWithNoNodesAttachedToRoot)
     graph.add(&sampler1);
     graph.add(&sampler2);
     graph.set_parent(&sampler1, &sampler2);
-    graph.build();
-    auto *order = graph.order();
-    ASSERT_EQ(nullptr, order);
+    vector<GraphNode<Sampler> *> order;
+    graph.build(order);
+    ASSERT_EQ(0, order.size());
 }
 
 TEST(DependencyGraphTest, TestOneItemWithOneDependency)
@@ -32,15 +26,13 @@ TEST(DependencyGraphTest, TestOneItemWithOneDependency)
     graph.add(&sampler2);
     graph.attach_to_root(&sampler1);
     graph.set_parent(&sampler1, &sampler2);
-    graph.build();
-    auto *order = graph.order();
-    ASSERT_NE(nullptr, order);
-    ASSERT_EQ(&sampler1, order->data);
-    order = order->order_list_next;
-    ASSERT_NE(nullptr, order);
-    ASSERT_EQ(&sampler2, order->data);
-    order = order->order_list_next;
-    ASSERT_EQ(nullptr, order);
+    vector<GraphNode<Sampler> *> order;
+    graph.build(order);
+    ASSERT_EQ(2, order.size());
+    ASSERT_EQ(&sampler2, order[0]->data);
+    ASSERT_EQ(&sampler1, order[1]->data);
+    ASSERT_EQ(-1, order[0]->dependency_index);
+    ASSERT_EQ(0, order[1]->dependency_index);
 }
 
 TEST(DependencyGraphTest, TestOneItemWithTwoDependencies)
@@ -53,18 +45,18 @@ TEST(DependencyGraphTest, TestOneItemWithTwoDependencies)
     graph.attach_to_root(&sampler1);
     graph.set_parent(&sampler1, &sampler2);
     graph.set_parent(&sampler1, &sampler3);
-    graph.build();
-    auto *order = graph.order();
-    ASSERT_NE(nullptr, order);
-    ASSERT_EQ(&sampler1, order->data);
-    order = order->order_list_next;
-    ASSERT_NE(nullptr, order);
-    ASSERT_TRUE(order->data == &sampler2 || order->data == &sampler3);
-    order = order->order_list_next;
-    ASSERT_NE(nullptr, order);
-    ASSERT_TRUE(order->data == &sampler2 || order->data == &sampler3);
-    order = order->order_list_next;
-    ASSERT_EQ(nullptr, order);
+    vector<GraphNode<Sampler> * > order;
+    graph.build(order);
+    ASSERT_EQ(3, order.size());
+    auto *node = order[0];
+    ASSERT_TRUE(node->data == &sampler2 || node->data == &sampler3);
+    ASSERT_EQ(-1, node->dependency_index);
+    node = order[1];
+    ASSERT_TRUE(node->data == &sampler2 || node->data == &sampler3);
+    ASSERT_EQ(-1, node->dependency_index);
+    node = order[2];
+    ASSERT_EQ(&sampler1, node->data);
+    ASSERT_EQ(1, node->dependency_index);
 }
 
 TEST(DependencyGraphTest, TestDiamond)
@@ -80,21 +72,21 @@ TEST(DependencyGraphTest, TestDiamond)
     graph.set_parent(&sampler1, &sampler3);
     graph.set_parent(&sampler2, &sampler4);
     graph.set_parent(&sampler3, &sampler4);
-    graph.build();
-    auto *order = graph.order();
-    ASSERT_NE(nullptr, order);
-    ASSERT_EQ(&sampler1, order->data);
-    order = order->order_list_next;
-    ASSERT_NE(nullptr, order);
-    ASSERT_TRUE(order->data == &sampler2 || order->data == &sampler3);
-    order = order->order_list_next;
-    ASSERT_NE(nullptr, order);
-    ASSERT_TRUE(order->data == &sampler2 || order->data == &sampler3);
-    order = order->order_list_next;
-    ASSERT_NE(nullptr, order);
-    ASSERT_EQ(&sampler4, order->data);
-    order = order->order_list_next;
-    ASSERT_EQ(nullptr, order);
+    vector<GraphNode<Sampler> *> order;
+    graph.build(order);
+    ASSERT_EQ(4, order.size());
+    auto *node = order[0];
+    ASSERT_EQ(&sampler4, node->data);
+    ASSERT_EQ(-1, node->dependency_index);
+    node = order[1];
+    ASSERT_TRUE(node->data == &sampler2 || node->data == &sampler3);
+    ASSERT_EQ(0, node->dependency_index);
+    node = order[2];
+    ASSERT_TRUE(node->data == &sampler2 || node->data == &sampler3);
+    ASSERT_EQ(0, node->dependency_index);
+    node = order[3];
+    ASSERT_EQ(&sampler1, node->data);
+    ASSERT_EQ(2, node->dependency_index);
 }
 
 TEST(DependencyGraphTest, TestCircularDependency)
@@ -108,16 +100,39 @@ TEST(DependencyGraphTest, TestCircularDependency)
     graph.set_parent(&sampler1, &sampler2);
     graph.set_parent(&sampler2, &sampler3);
     graph.set_parent(&sampler3, &sampler1);
-    graph.build();
-    auto *order = graph.order();
-    ASSERT_NE(nullptr, order);
-    ASSERT_EQ(&sampler1, order->data);
-    order = order->order_list_next;
-    ASSERT_NE(nullptr, order);
-    ASSERT_EQ(&sampler2, order->data);
-    order = order->order_list_next;
-    ASSERT_NE(nullptr, order);
-    ASSERT_EQ(&sampler3, order->data);
-    order = order->order_list_next;
-    ASSERT_EQ(nullptr, order);
+    vector<GraphNode<Sampler> *> order;
+    graph.build(order);
+    ASSERT_EQ(3, order.size());
+}
+
+TEST(DependencyGraphTest, TestUnevenGraph)
+{
+    DependencyGraph<Sampler> graph;
+    DumbSampler sampler1, sampler2, sampler3, sampler4;
+    graph.add(&sampler1);
+    graph.add(&sampler2);
+    graph.add(&sampler3);
+    graph.add(&sampler4);
+    graph.attach_to_root(&sampler1);
+    graph.attach_to_root(&sampler2);
+    graph.attach_to_root(&sampler3);
+    graph.set_parent(&sampler2, &sampler4);
+    vector<GraphNode<Sampler> *> order;
+    graph.build(order);
+    ASSERT_EQ(4, order.size());
+    for (const auto *node : order) {
+        if (node->data == &sampler1) {
+            ASSERT_EQ(-1, node->dependency_index);
+        }
+        if (node->data == &sampler2) {
+            ASSERT_EQ(order[node->dependency_index]->data, &sampler4);
+        }
+        if (node->data == &sampler3) {
+            ASSERT_EQ(-1, node->dependency_index);
+        }
+        if (node->data == &sampler4) {
+            ASSERT_EQ(-1, node->dependency_index);
+        }
+    }
+
 }

@@ -10,32 +10,38 @@ SamplerWorker::SamplerWorker()
     : _lock(_mutex)
 {
     _is_running = true;
-    _sampler_count = 0;
+    _input_count = 0;
+    _sampler_node = nullptr;
+}
+
+void SamplerWorker::reset() {
+    _sampler_node = nullptr;
 }
 
 void SamplerWorker::setup(
-    float **buffers, Sampler **samplers, size_t buffer_length,
-    size_t sampler_count, Semaphore *semaphore
+    const float **input_buffers,
+    float *output_buffer,
+    const GraphNode<Sampler> *sampler_node,
+    size_t input_count,
+    size_t buffer_length,
+    Semaphore *semaphore
 ) {
     unique_lock<mutex> lock(_mutex);
     _buffer_length = buffer_length;
 
-    if (_sampler_count != sampler_count) {
-        _buffers = unique_ptr<float *[]>(new float *[sampler_count]);
-        _samplers = unique_ptr<Sampler *[]>(new Sampler *[sampler_count]);
-        //copy_n(buffers, _sampler_count, _buffers.get());
-        //copy_n(samplers, _sampler_count, _samplers.get());
-        for (size_t i = 0; i < sampler_count; ++i) {
-            _buffers[i] = buffers[i];
-            _samplers[i] = samplers[i];
+    if (_input_count != input_count) {
+        _input_buffers = unique_ptr<const float *[]>(new const float *[input_count]);
+        for (size_t i = 0; i < input_count; ++i) {
+            _input_buffers[i] = input_buffers[i];
         }
-
-        _sampler_count = sampler_count;
+        _input_count = input_count;
     }
 
+    _sampler_node = sampler_node;
+    _output_buffer = output_buffer;
+    _buffer_length = buffer_length;
     _semaphore = semaphore;
     _is_waiting = false;
-    lock.unlock();
     _cv.notify_all();
 }
 
@@ -46,32 +52,21 @@ void SamplerWorker::process() {
             _cv.wait(_lock);
         }
         if (_is_running) {
-            // Generate sample data
-            for (size_t i = 0; i < _sampler_count; ++i) {
-                _samplers[i]->sample(_buffers[i], _buffer_length);
-            }
-
-            // Mix data together
-            float *mix = _buffers[0];
-            for (size_t i = 1; i < _sampler_count; ++i) {
-                float *source = _buffers[i];
-                for (size_t sample_index = 0; sample_index < _buffer_length; ++sample_index) {
-                    float accumulated_sample = mix[sample_index];
-                    mix[sample_index] = accumulated_sample + source[sample_index];
-                }
-            }
-
+            _sampler_node->data->sample(_input_buffers.get(), _output_buffer, _input_count, _buffer_length);
             _semaphore->return_worker(this);
         }
     }
 }
 
 void SamplerWorker::stop() {
+    unique_lock<mutex> lock(_mutex);
+    _is_waiting = false;
     _is_running = false;
+    _cv.notify_all();
 }
 
-float *SamplerWorker::mixed_buffer() const {
-    return _buffers[0];
+const GraphNode<Sampler> *SamplerWorker::sampler_node() const {
+    return _sampler_node;
 }
 
 Semaphore::Semaphore() {}
@@ -102,7 +97,7 @@ void Semaphore::return_worker(SamplerWorker *worker) {
 
 SamplerWorker *Semaphore::wait() {
     unique_lock<mutex> lock(_mutex);
-    while (_free_workers.size() < 1) {
+    while (_free_workers.empty()) {
         _cv.wait(lock);
     }
     SamplerWorker *worker = _free_workers.back();

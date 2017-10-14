@@ -32,6 +32,15 @@ int main(int argc, char **argv) {
     system.add_sampler(&square3);
     system.add_sampler(&square4);
 
+    system.route_sampler_to_root(&sampler1);
+    system.route_sampler_to_root(&sampler2);
+    system.route_sampler_to_root(&sampler3);
+    system.route_sampler_to_root(&sampler4);
+    system.route_sampler_to_root(&square1);
+    system.route_sampler_to_root(&square2);
+    system.route_sampler_to_root(&square3);
+    system.route_sampler_to_root(&square4);
+
     system.set_thread_count(4);
     RealTimeSoundSystemManager manager(&system);
 

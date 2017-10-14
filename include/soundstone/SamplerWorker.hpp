@@ -1,5 +1,6 @@
 #pragma once
 #include "Sampler.hpp"
+#include "DependencyGraph.hpp"
 #include <cstddef>
 #include <vector>
 #include <condition_variable>
@@ -29,22 +30,28 @@ namespace soundstone {
         std::condition_variable _cv;
         std::mutex _mutex;
         std::unique_lock<std::mutex> _lock;
-        std::unique_ptr<Sampler *[]> _samplers;
-        std::unique_ptr<float *[]> _buffers;
+        const GraphNode<Sampler> *_sampler_node;
+        std::unique_ptr<const float *[]> _input_buffers;
+        float *_output_buffer;
         Semaphore *_semaphore;
+        size_t _input_count;
         size_t _buffer_length;
-        size_t _sampler_count;
         bool _is_running;
         bool _is_waiting;
     public:
         SamplerWorker();
+        void reset();
         void setup(
-            float **buffers, Sampler **samplers, size_t buffer_length,
-            size_t sampler_count, Semaphore *semaphore
+            const float **input_buffers,
+            float *output_buffer,
+            const GraphNode<Sampler> *sampler_node,
+            size_t input_count,
+            size_t buffer_length,
+            Semaphore *semaphore
         );
         void process();
         void stop();
-        float *mixed_buffer() const;
+        const GraphNode<Sampler> *sampler_node() const;
     };
 
 }

@@ -8,10 +8,15 @@ namespace soundstone_example {
         unsigned int _samples_per_cycle;
         unsigned int _i;
     public:
-        SquareSampler(float frequency);
+        explicit SquareSampler(float frequency);
         void setup(unsigned int sample_rate) override;
         void commit() override;
-        size_t sample(float *data, size_t nsamples) override;
+        size_t sample(
+            const float **input_data,
+            float *output_data,
+            size_t input_count,
+            size_t nsamples
+        ) override;
         void set_amplitude(float amplitude);
     };
 }

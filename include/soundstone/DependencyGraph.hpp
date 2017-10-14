@@ -10,10 +10,9 @@ namespace soundstone {
     class GraphNode {
     public:
         T *data;
-        unsigned int generation;
         std::vector<GraphNode<T> *> inputs;
-        GraphNode<T> *order_list_next;
-
+        int order_list_index;
+        int dependency_index;
         GraphNode();
     };
 
@@ -29,8 +28,8 @@ namespace soundstone {
         void add(T *data);
         void set_parent(T *child, T *parent);
         void attach_to_root(T* parent);
-        void build();
-        const GraphNode<T> *order() const;
+        void build(std::vector<GraphNode<T> *> &nodes);
+        const GraphNode<T>& root() const;
     };
 
     extern template class GraphNode<Sampler>;

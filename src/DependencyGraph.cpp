@@ -7,8 +7,6 @@ using namespace std;
 
 template <typename T>
 GraphNode<T>::GraphNode() {
-    generation = 0;
-    order_list_next = nullptr;
 }
 
 template <typename T>
@@ -62,35 +60,36 @@ void DependencyGraph<T>::attach_to_root(T *parent) {
 
 
 template <typename T>
-void DependencyGraph<T>::build() {
+void DependencyGraph<T>::build(vector<GraphNode<T> *> &nodes_in_order) {
 
-    // Un-set generation of all nodes
+    // Un-set index of all nodes
     for (unique_ptr<GraphNode<T>> &node : _nodes) {
-        node->generation = 0;
+        node->order_list_index = -1;
     }
-    _root.generation = 0;
+    _root.order_list_index = -1;
 
     vector<GraphNode<T> *> node_stack;
     node_stack.push_back(&_root);
     unsigned int max_gen = 0;
+    nodes_in_order.clear();
 
-    while (node_stack.size() > 0) {
+    while (!node_stack.empty()) {
         GraphNode<T> *current_node = node_stack.back();
 
         GraphNode<T> *unresolved_parent = nullptr;
-        unsigned int youngest_gen = 0;
+        int youngest_parent_dependency = -1;
         for (GraphNode<T> *parent_node : current_node->inputs) {
             // Check for circular dependency
             if (find(node_stack.begin(), node_stack.end(), parent_node) != node_stack.end()) {
                 // TODO: Warn of circular dependency
             }
             else {
-                unsigned int parent_gen = parent_node->generation;
-                if (parent_gen == 0) {
+                int parent_index = parent_node->order_list_index;
+                if (parent_index == -1) {
                     unresolved_parent = parent_node;
                     break;
                 }
-                youngest_gen = max(youngest_gen, parent_gen);
+                youngest_parent_dependency = max(youngest_parent_dependency, parent_index);
             }
         }
 
@@ -99,55 +98,22 @@ void DependencyGraph<T>::build() {
             continue;
         }
 
-        // All parents are resolved, we can determine the correct generation
-        // for this node.
-        unsigned int gen = youngest_gen + 1;
-        current_node->generation = gen;
-        max_gen = max(max_gen, gen);
+        // All parents are resolved
+        current_node->order_list_index = static_cast<int>(nodes_in_order.size());
+        current_node->dependency_index = youngest_parent_dependency;
+        if (current_node != &_root) {
+            nodes_in_order.push_back(current_node);
+        }
         node_stack.pop_back();
     }
-
-    // Decrement max gen as the root node does not count.
-    --max_gen;
-
-    if (max_gen == 0) {
-        // early out
-        _root.order_list_next = nullptr;
-        return;
-    }
-
-    // Build nodes by generation
-    vector<vector<GraphNode<T> *>> nodes_by_generation;
-    nodes_by_generation.resize(max_gen);
-    for (unique_ptr<GraphNode<T>> &node : _nodes) {
-        if (node->generation != 0) {
-            assert(node->generation > 0 && node->generation <= max_gen);
-            vector<GraphNode<T> *> &gen_list = nodes_by_generation[node->generation - 1];
-            gen_list.push_back(node.get());
-        }
-    }
-
-    // Build intrusive order list
-    GraphNode<T> *previous = &_root;
-    for (size_t i = nodes_by_generation.size(); i > 0; --i) {
-        const vector<GraphNode<T> *> &gen_list = nodes_by_generation[i - 1];
-        for (GraphNode<T> *node : gen_list) {
-            previous->order_list_next = node;
-            previous = node;
-        }
-    }
-    previous->order_list_next = nullptr;
-
-    // I think that's it.
 }
 
 template <typename T>
-const GraphNode<T> *DependencyGraph<T>::order() const {
-    return _root.order_list_next;
+const GraphNode<T> &DependencyGraph<T>::root() const {
+    return _root;
 }
 
 namespace soundstone {
     template class GraphNode<Sampler>;
     template class DependencyGraph<Sampler>;
-
 }

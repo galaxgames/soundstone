@@ -1,6 +1,7 @@
 #pragma once
 #include "Sampler.hpp"
 #include "SamplerWorker.hpp"
+#include "DependencyGraph.hpp"
 #include <soundstone/RingBuffer.hpp>
 #include <cubeb/cubeb.h>
 #include <vector>
@@ -17,21 +18,21 @@ namespace soundstone {
         cubeb *_cubeb;
         cubeb_stream *_stream;
 
-        // Copyable primitives
         cubeb_state _state;
         unsigned int _sample_rate;
         unsigned int _latency;
         size_t _sampler_buffer_length;
 
         std::vector<Sampler *> _samplers;
-        std::unordered_set<Sampler *> _sampler_set;
-
         std::vector<std::unique_ptr<SamplerWorker>> _workers;
         std::vector<std::thread> _threads;
         std::vector<std::unique_ptr<float[]>> _sampler_buffers;
         Semaphore _semaphore;
         RingBuffer<float> _data;
         std::mutex _data_mutex;
+        DependencyGraph<Sampler> _sampler_graph;
+        std::vector<GraphNode<Sampler> *> _ordered_samplers;
+        bool _is_graph_dirty;
 
         void move_internal(SoundSystem &&other) noexcept;
         bool init_cubeb();
@@ -64,6 +65,8 @@ namespace soundstone {
         size_t samples_buffered() const;
         unsigned int sample_rate() const;
         void add_sampler(Sampler *sampler);
+        void route_sampler(Sampler *sampler, Sampler *target);
+        void route_sampler_to_root(Sampler *sampler);
         void remove_sampler(Sampler *sampler);
         void update(size_t nsamples);
         void set_thread_count(size_t count);
