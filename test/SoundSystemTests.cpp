@@ -82,7 +82,7 @@ TEST(SoundSystemTest, TestRoutingMultipleInputs)
 
     EXPECT_CALL(sampler1, sample(_, NotNull(), 0, 1)).WillOnce(DoAll(SetArgPointee<1>(1.0f), Return(1)));
     EXPECT_CALL(sampler2, sample(_, NotNull(), 0, 1)).WillOnce(DoAll(SetArgPointee<1>(2.0f), Return(1)));
-    EXPECT_CALL(sampler2, sample(
+    EXPECT_CALL(sampler3, sample(
         AnyPointeeAtIndices(0, 2, AnyOf(Pointee(1.0f), Pointee(2.0f))),
         NotNull(), 2, 1
     )).Times(1);
@@ -119,7 +119,7 @@ TEST(SoundSystemTest, TestRoutingDiamond)
     system.add_sampler(&sampler1);
     system.add_sampler(&sampler2);
     system.add_sampler(&sampler3);
-    system.add_sampler(&sampler3);
+    system.add_sampler(&sampler4);
     system.route_sampler(&sampler1, &sampler2);
     system.route_sampler(&sampler1, &sampler3);
     system.route_sampler(&sampler2, &sampler4);

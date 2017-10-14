@@ -180,8 +180,15 @@ void SoundSystem::remove_sampler(Sampler *sampler) {
             _samplers.erase(_samplers.begin() + it_offset);
         }
     }
-    // TODO: Remove from sampler graph
+    _sampler_graph.remove(sampler);
+    _is_graph_dirty = true;
 }
+
+enum class SamplerWorkStatus {
+    NotStarted,
+    Started,
+    Done
+};
 
 void SoundSystem::update(size_t nsamples) {
     // Early out if we have no root samplers
@@ -207,8 +214,10 @@ void SoundSystem::update(size_t nsamples) {
 
     // Create ordered sampler queue
     vector<const GraphNode<Sampler> *> ordered_samplers;
+    vector<SamplerWorkStatus> statuses;
     vector<const GraphNode<Sampler> *> ready_samplers;
     ordered_samplers.insert(ordered_samplers.end(), _ordered_samplers.begin(), _ordered_samplers.end());
+    statuses.insert(statuses.end(), ordered_samplers.size(), SamplerWorkStatus::NotStarted);
 
     // Create new buffers if needed
     while (_sampler_buffers.size() < ordered_samplers.size()) {
@@ -250,6 +259,10 @@ void SoundSystem::update(size_t nsamples) {
     for (;;) {
         SamplerWorker *worker = _semaphore.wait();
 
+        if (worker->sampler_node() != nullptr) {
+            statuses[worker->sampler_node()->order_list_index] = SamplerWorkStatus::Done;
+        }
+
         if (ready_samplers.empty()) {
             // Figure out what samplers to work on next
             bool is_finished = true;
@@ -257,12 +270,16 @@ void SoundSystem::update(size_t nsamples) {
                 if (node == nullptr) {
                     continue;
                 }
-                is_finished = false;
                 int dependency_index = node->dependency_index;
-                if (dependency_index == -1 || ordered_samplers[dependency_index] == nullptr) {
+                SamplerWorkStatus status = statuses[node->order_list_index];
+                if (status != SamplerWorkStatus::NotStarted) {
+                    continue;
+                }
+                is_finished = false;
+                if (dependency_index == -1 || statuses[dependency_index] == SamplerWorkStatus::Done) {
                     // Dependency met, this node is ready
+                    statuses[node->order_list_index] = SamplerWorkStatus::Started;
                     ready_samplers.push_back(node);
-                    ordered_samplers[node->order_list_index] = nullptr;
                 }
             }
 
@@ -277,7 +294,7 @@ void SoundSystem::update(size_t nsamples) {
             size_t input_count = node->inputs.size();
             unique_ptr<const float *[]> input_buffers(new const float *[input_count]);
             for (size_t i = 0; i < input_count; ++i) {
-                const GraphNode<Sampler> *input_node = node->inputs[i];
+                GraphNode<Sampler> *input_node = node->inputs[i].lock().get();
                 input_buffers[i] = _sampler_buffers[input_node->order_list_index].get();
             }
             float *output_buffer = _sampler_buffers[node->order_list_index].get();
@@ -299,9 +316,9 @@ void SoundSystem::update(size_t nsamples) {
     // since the number of buffers that needs to be mixed is only equal to the
     // thread count. So yeah, not sure if it would be efficient or not.
     const GraphNode<Sampler> &root = _sampler_graph.root();
-    float *accumulator_buffer = _sampler_buffers[root.inputs[0]->order_list_index].get();
+    float *accumulator_buffer = _sampler_buffers[root.inputs[0].lock().get()->order_list_index].get();
     for (size_t i = 1, ilen = root.inputs.size(); i < ilen; ++i) {
-        const GraphNode<Sampler> *right_node = root.inputs[i];
+        const GraphNode<Sampler> *right_node = root.inputs[i].lock().get();
         float *right_buffer = _sampler_buffers[right_node->order_list_index].get();
         mix(accumulator_buffer, right_buffer, nsamples);
     }

@@ -5,6 +5,7 @@
 using namespace soundstone;
 using namespace soundstone_test;
 using namespace std;
+using namespace testing;
 
 TEST(DependencyGraphTest, TestBuiltWithNoNodesAttachedToRoot)
 {
@@ -134,5 +135,54 @@ TEST(DependencyGraphTest, TestUnevenGraph)
             ASSERT_EQ(-1, node->dependency_index);
         }
     }
+}
 
+TEST(DependencyGraphTest, TestRemoveItem)
+{
+    DependencyGraph<Sampler> graph;
+    DumbSampler sampler1, sampler2, sampler3;
+    graph.add(&sampler1);
+    graph.add(&sampler2);
+    graph.add(&sampler3);
+    graph.attach_to_root(&sampler3);
+    graph.set_parent(&sampler3, &sampler2);
+    graph.set_parent(&sampler2, &sampler1);
+    graph.remove(&sampler2);
+    vector<GraphNode<Sampler> *> order;
+    graph.build(order);
+    ASSERT_EQ(1, order.size());
+    auto *node = order[0];
+    ASSERT_EQ(&sampler3, node->data);
+    ASSERT_EQ(-1, node->dependency_index);
+    ASSERT_EQ(0, node->inputs.size());
+}
+
+TEST(DependencyGraphTest, TestResurrectItem)
+{
+    DependencyGraph<Sampler> graph;
+    DumbSampler sampler1, sampler2, sampler3;
+    graph.add(&sampler1);
+    graph.add(&sampler2);
+    graph.add(&sampler3);
+    graph.attach_to_root(&sampler3);
+    graph.set_parent(&sampler3, &sampler2);
+    graph.set_parent(&sampler2, &sampler1);
+    graph.remove(&sampler2);
+    graph.add(&sampler2);
+    graph.set_parent(&sampler2, &sampler1);
+    vector<GraphNode<Sampler> *> order;
+    graph.build(order);
+    ASSERT_EQ(1, order.size());
+    auto *node = order[0];
+    ASSERT_EQ(&sampler3, node->data);
+    ASSERT_EQ(-1, node->dependency_index);
+    ASSERT_EQ(0, node->inputs.size());
+}
+
+TEST(DependencyGraphTest, TestAddSameDataTwice)
+{
+    DependencyGraph<Sampler> graph;
+    DumbSampler sampler1;
+    graph.add(&sampler1);
+    ASSERT_EXIT(graph.add(&sampler1), KilledBySignal(SIGABRT), "Assertion failed:");
 }

@@ -10,7 +10,7 @@ namespace soundstone {
     class GraphNode {
     public:
         T *data;
-        std::vector<GraphNode<T> *> inputs;
+        std::vector<std::weak_ptr<GraphNode<T>>> inputs;
         int order_list_index;
         int dependency_index;
         GraphNode();
@@ -18,14 +18,14 @@ namespace soundstone {
 
     template <typename T>
     class DependencyGraph {
-        std::vector<std::unique_ptr<GraphNode<T>>> _nodes;
-        std::unordered_map<T *, GraphNode<T> *> _nodes_by_data;
+        std::unordered_map<T *, std::shared_ptr<GraphNode<T>>> _nodes;
         GraphNode<T> _root;
 
     public:
         DependencyGraph();
 
         void add(T *data);
+        void remove(T *data);
         void set_parent(T *child, T *parent);
         void attach_to_root(T* parent);
         void build(std::vector<GraphNode<T> *> &nodes);
