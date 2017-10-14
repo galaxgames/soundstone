@@ -184,5 +184,5 @@ TEST(DependencyGraphTest, TestAddSameDataTwice)
     DependencyGraph<Sampler> graph;
     DumbSampler sampler1;
     graph.add(&sampler1);
-    ASSERT_EXIT(graph.add(&sampler1), KilledBySignal(SIGABRT), "Assertion failed:");
+    EXPECT_DEATH(graph.add(&sampler1), "");
 }
