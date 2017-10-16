@@ -1,110 +1,51 @@
-#include <soundstone/SoundSystem.hpp>
+#include <soundstone/AudioProcessor.hpp>
 #include <stack>
 #include <cassert>
-
 #include <iostream>
 
 using namespace soundstone;
 using namespace std;
 
 
-SoundSystem::SoundSystem() {
-    cubeb_init(&_cubeb, nullptr, nullptr);
-    _stream = nullptr;
-    _state = CUBEB_STATE_ERROR;
+AudioProcessor::AudioProcessor() {
     _sampler_buffer_length = 0;
     _is_graph_dirty = true;
-    if (!init_cubeb()) {
-        destroy_cubeb();
-    }
     setup_workers(1);
 }
 
-void SoundSystem::move_internal(SoundSystem &&other) noexcept {
-    _cubeb = other._cubeb;
-    _stream = other._stream;
-
-    _state = other._state;
-    _sample_rate = other._sample_rate;
-    _latency = other._latency;
-
+void AudioProcessor::move_internal(AudioProcessor &&other) noexcept {
+    _sampler_buffer_length = other._sampler_buffer_length;
     _samplers = move(other._samplers);
     _workers = move(other._workers);
     _threads = move(other._threads);
     _sampler_buffers = move(other._sampler_buffers);
     _semaphore = move(other._semaphore);
-    _data = move(other._data);
+    _sampler_graph = move(other._sampler_graph);
+    _ordered_samplers = move(other._ordered_samplers);
+    _is_graph_dirty = other._is_graph_dirty;
+    _sample_rate = other._sample_rate;
+
+    other._sampler_buffer_length = 0;
+    other._is_graph_dirty = true;
 }
 
-SoundSystem::SoundSystem(SoundSystem &&other) noexcept {
-    lock_guard<mutex> lock(other._data_mutex);
+AudioProcessor::AudioProcessor(AudioProcessor &&other) noexcept {
+    assert(&other != this);
     move_internal(move(other));
 }
 
-SoundSystem &SoundSystem::operator=(SoundSystem &&other) noexcept {
-    if (&other != this) {
-        unique_lock<mutex> lhs_lock(_data_mutex, defer_lock);
-        unique_lock<mutex> rhs_lock(other._data_mutex, defer_lock);
-        lock(lhs_lock, rhs_lock);
-        move_internal(move(other));
-    }
+AudioProcessor &AudioProcessor::operator=(AudioProcessor &&other) noexcept {
+    assert(&other != this);
+    move_internal(move(other));
     return *this;
 }
 
-SoundSystem::~SoundSystem() {
+AudioProcessor::~AudioProcessor() {
     // Stop all workers
     setup_workers(0);
-    destroy_cubeb();
 }
 
-bool SoundSystem::init_cubeb() {
-    int rv;
-
-    rv = cubeb_get_preferred_sample_rate(_cubeb, &_sample_rate);
-    if (rv != CUBEB_OK) {
-        return false;
-    }
-
-    cubeb_stream_params output_params;
-    output_params.format = CUBEB_SAMPLE_FLOAT32NE;
-    output_params.channels = 1;
-    output_params.rate = _sample_rate;
-    output_params.layout = CUBEB_LAYOUT_UNDEFINED;
-
-    rv = cubeb_get_min_latency(_cubeb, &output_params, &_latency);
-    if (rv != CUBEB_OK) {
-        return false;
-    }
-
-    rv = cubeb_stream_init(_cubeb, &_stream, "Soundstone Application",
-        nullptr, nullptr,
-        nullptr, &output_params,
-        _latency, data_callback, state_callback, this
-    );
-    if (rv != CUBEB_OK) {
-        return false;
-    }
-
-    rv = cubeb_stream_start(_stream);
-    if (rv != CUBEB_OK) {
-        return false;
-    }
-
-    return true;
-}
-
-void SoundSystem::destroy_cubeb() {
-    if (_stream != nullptr) {
-        cubeb_stream_destroy(_stream);
-        _stream = nullptr;
-    }
-    if (_cubeb != nullptr) {
-        cubeb_destroy(_cubeb);
-        _cubeb = nullptr;
-    }
-}
-
-void SoundSystem::setup_workers(size_t count) {
+void AudioProcessor::setup_workers(size_t count) {
     assert(_workers.size() == _threads.size());
     if (_workers.size() < count) {
         _workers.reserve(count);
@@ -131,48 +72,26 @@ void SoundSystem::setup_workers(size_t count) {
     }
 }
 
-bool SoundSystem::is_ok() const {
-    return _cubeb != nullptr && _stream != nullptr;
-}
 
-bool SoundSystem::is_steam_ok() const {
-    return _state != CUBEB_STATE_ERROR;
-}
 
-bool SoundSystem::is_stream_playing() const {
-    return _state == CUBEB_STATE_STARTED;
-}
-
-bool SoundSystem::is_stream_drained() const {
-    return _state == CUBEB_STATE_DRAINED;
-}
-
-size_t SoundSystem::samples_buffered() const {
-    return _data.size();
-}
-
-unsigned int SoundSystem::sample_rate() const {
-    return _sample_rate;
-}
-
-void SoundSystem::add_sampler(Sampler *sampler) {
+void AudioProcessor::add_sampler(Sampler *sampler) {
     _samplers.push_back(sampler);
     sampler->setup(_sample_rate);
     _sampler_graph.add(sampler);
     _is_graph_dirty = true;
 }
 
-void SoundSystem::route_sampler(Sampler *sampler, Sampler *target) {
+void AudioProcessor::route_sampler(Sampler *sampler, Sampler *target) {
     _sampler_graph.set_parent(target, sampler);
     _is_graph_dirty = true;
 }
 
-void SoundSystem::route_sampler_to_root(Sampler *sampler) {
+void AudioProcessor::route_sampler_to_root(Sampler *sampler) {
     _sampler_graph.attach_to_root(sampler);
     _is_graph_dirty = true;
 }
 
-void SoundSystem::remove_sampler(Sampler *sampler) {
+void AudioProcessor::remove_sampler(Sampler *sampler) {
     for (size_t i = 0, ilen = _samplers.size(); i < ilen; ++i) {
         Sampler *other = _samplers[i];
         if (other == sampler) {
@@ -190,7 +109,7 @@ enum class SamplerWorkStatus {
     Done
 };
 
-void SoundSystem::update(size_t nsamples) {
+void AudioProcessor::update(float *data, size_t nsamples) {
     // Early out if we have no root samplers
     if (_sampler_graph.root().inputs.empty()) {
         return;
@@ -315,63 +234,34 @@ void SoundSystem::update(size_t nsamples) {
     // Note: Even this could be parallized, but it's not that big of a deal
     // since the number of buffers that needs to be mixed is only equal to the
     // thread count. So yeah, not sure if it would be efficient or not.
+    for (size_t i = 0; i < nsamples; ++i) {
+        data[i] = 0;
+    }
+
     const GraphNode<Sampler> &root = _sampler_graph.root();
-    float *accumulator_buffer = _sampler_buffers[root.inputs[0].lock().get()->order_list_index].get();
-    for (size_t i = 1, ilen = root.inputs.size(); i < ilen; ++i) {
+    for (size_t i = 0, ilen = root.inputs.size(); i < ilen; ++i) {
         const GraphNode<Sampler> *right_node = root.inputs[i].lock().get();
         float *right_buffer = _sampler_buffers[right_node->order_list_index].get();
-        mix(accumulator_buffer, right_buffer, nsamples);
-    }
-
-    // Submit the final mix to the ringbuffer to be consumed by cubeb.
-    {
-        lock_guard<mutex> lock(_data_mutex);
-        _data.produce(accumulator_buffer, nsamples);
-    }
-
-    // Restart the stream if we previously ran out of data
-    if (is_ok()
-        && (_state == CUBEB_STATE_DRAINED
-            || _state == CUBEB_STATE_STOPPED)
-    ) {
-        cubeb_stream_start(_stream);
+        mix(data, right_buffer, nsamples);
     }
 }
 
-void SoundSystem::set_thread_count(size_t count) {
+void AudioProcessor::set_thread_count(size_t count) {
     assert(count > 0);
     setup_workers(count);
 }
 
+void AudioProcessor::set_sample_rate(unsigned int sample_rate) {
+    _sample_rate = sample_rate;
+    for (Sampler *sampler : _samplers) {
+        sampler->setup(sample_rate);
+    }
+}
 
-void SoundSystem::mix(float *a, const float *b, size_t count) {
+void AudioProcessor::mix(float *a, const float *b, size_t count) {
     for (size_t i = 0; i < count; ++i) {
         float sample_a = a[i];
         float sample_b = b[i];
         a[i] = sample_a + sample_b;
     }
-}
-
-long SoundSystem::data_callback(
-    cubeb_stream *stream, void *user_ptr, const void *input_buffer,
-    void *output_buffer, long nframes
-) {
-    SoundSystem *system = reinterpret_cast<SoundSystem *>(user_ptr);
-    size_t actual_frames;
-    {
-        lock_guard<mutex> lock(system->_data_mutex);
-        actual_frames = min(static_cast<size_t>(nframes), system->_data.size());
-        system->_data.consume(
-            reinterpret_cast<float *>(output_buffer),
-            actual_frames
-        );
-    }
-    return static_cast<long>(actual_frames);
-}
-
-void SoundSystem::state_callback(
-    cubeb_stream *stream, void *user_ptr, cubeb_state state
-) {
-    SoundSystem *system = reinterpret_cast<SoundSystem *>(user_ptr);
-    system->_state = state;
 }

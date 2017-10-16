@@ -1,44 +1,49 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <soundstone/SoundSystem.hpp>
+#include <soundstone/AudioProcessor.hpp>
 #include "mocks/MockSampler.hpp"
+#include <memory>
 
 using namespace soundstone;
 using namespace soundstone_test;
 using namespace testing;
+using namespace std;
 
-TEST(SoundSystemTest, TestConstructDestruct)
+TEST(AudioProcessorTests, TestConstructDestruct)
 {
-    SoundSystem system;
+    AudioProcessor processor;
 }
 
-TEST(SoundSystemTest, TestUpdateWithZeroSamplers)
+TEST(AudioProcessorTests, TestUpdateWithZeroSamplers)
 {
-    SoundSystem system;
-    system.update(1024);
+    AudioProcessor processor;
+    auto buff = unique_ptr<float[]>(new float[1024]);
+    processor.update(buff.get(), 1024);
 }
 
-TEST(SoundSystemTest, TestRemoveSampler)
+TEST(AudioProcessorTests, TestRemoveSampler)
 {
     NiceMock<MockSampler> sampler1, sampler2;
-    SoundSystem system;
+    AudioProcessor processor;
+    auto buff = unique_ptr<float[]>(new float[1]);
 
     EXPECT_CALL(sampler1, sample(_, NotNull(), 0, 1)).Times(1);
     EXPECT_CALL(sampler2, sample(_, NotNull(), _, _)).Times(0);
 
-    system.add_sampler(&sampler1);
-    system.add_sampler(&sampler2);
-    system.route_sampler_to_root(&sampler1);
-    system.route_sampler_to_root(&sampler2);
-    system.remove_sampler(&sampler2);
-    system.update(1);
+    processor.add_sampler(&sampler1);
+    processor.add_sampler(&sampler2);
+    processor.route_sampler_to_root(&sampler1);
+    processor.route_sampler_to_root(&sampler2);
+    processor.remove_sampler(&sampler2);
+    processor.update(buff.get(), 1);
 }
 
-TEST(SoundSystemTest, TestSimpleRouting)
+TEST(AudioProcessorTests, TestSimpleRouting)
 {
     // Sampler 1 -> Sampler 2 -> root
     NiceMock<MockSampler> sampler1, sampler2;
-    SoundSystem system;
+    AudioProcessor system;
+    auto buff = unique_ptr<float[]>(new float[1]);
 
     EXPECT_CALL(sampler1, sample(_, NotNull(), 0, 1)).WillOnce(DoAll(SetArgPointee<1>(1.0f), Return(1)));
     EXPECT_CALL(sampler2, sample(Pointee(Pointee(1)), NotNull(), 1, 1)).Times(1);
@@ -47,7 +52,7 @@ TEST(SoundSystemTest, TestSimpleRouting)
     system.add_sampler(&sampler2);
     system.route_sampler(&sampler1, &sampler2);
     system.route_sampler_to_root(&sampler2);
-    system.update(1);
+    system.update(buff.get(), 1);
 }
 
 MATCHER_P2(PointeeAtIndex, n, m, "") {
@@ -72,13 +77,14 @@ MATCHER_P3(AllPointeesAtIndices, from, to, m, "") {
     return true;
 }
 
-TEST(SoundSystemTest, TestRoutingMultipleInputs)
+TEST(AudioProcessorTests, TestRoutingMultipleInputs)
 {
     // Sampler 1 - Sampler 3 -> root
     //           /
     // Sampler 2
     NiceMock<MockSampler> sampler1, sampler2, sampler3;
-    SoundSystem system;
+    AudioProcessor system;
+    auto buff = unique_ptr<float[]>(new float[1]);
 
     EXPECT_CALL(sampler1, sample(_, NotNull(), 0, 1)).WillOnce(DoAll(SetArgPointee<1>(1.0f), Return(1)));
     EXPECT_CALL(sampler2, sample(_, NotNull(), 0, 1)).WillOnce(DoAll(SetArgPointee<1>(2.0f), Return(1)));
@@ -93,16 +99,17 @@ TEST(SoundSystemTest, TestRoutingMultipleInputs)
     system.route_sampler(&sampler1, &sampler3);
     system.route_sampler(&sampler2, &sampler3);
     system.route_sampler_to_root(&sampler3);
-    system.update(1);
+    system.update(buff.get(), 1);
 }
 
-TEST(SoundSystemTest, TestRoutingDiamond)
+TEST(AudioProcessorTests, TestRoutingDiamond)
 {
     //             Sampler 2
     // Sampler 1 <           > root
     //             Sampler 3
     NiceMock<MockSampler> sampler1, sampler2, sampler3, sampler4;
-    SoundSystem system;
+    AudioProcessor system;
+    auto buff = unique_ptr<float[]>(new float[1]);
 
     EXPECT_CALL(sampler1, sample(_, NotNull(), 0, 1)).WillOnce(DoAll(SetArgPointee<1>(1.0f), Return(1)));
     EXPECT_CALL(sampler2, sample(
@@ -125,5 +132,5 @@ TEST(SoundSystemTest, TestRoutingDiamond)
     system.route_sampler(&sampler2, &sampler4);
     system.route_sampler(&sampler3, &sampler4);
     system.route_sampler_to_root(&sampler4);
-    system.update(1);
+    system.update(buff.get(), 1);
 }
