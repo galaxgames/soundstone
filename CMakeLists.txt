@@ -110,11 +110,11 @@ install(
 )
 install(
     DIRECTORY "${PROJECT_SOURCE_DIR}/include/soundstone"
-    DESTINATION "${CMAKE_INSTALL_PREFIX}/include"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}/include/soundstone"
 )
 install (
-    DIRECTORY "${PROJECT_BINARY_DIR}/include"
-    DESTINATION ${CMAKE_INSTALL_PREFIX}
+    DIRECTORY "${PROJECT_BINARY_DIR}/include/soundstone"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}/include/soundstone"
 )
 install(
     FILES "${project_config}" "${version_config}"
