@@ -26,6 +26,8 @@ add_executable(soundstone_test ${SOUNDSTONE_TEST_SOURCE_FILES})
 # main target.
 target_compile_definitions(soundstone PRIVATE SOUNDSTONE_TESTABLE_EXPORT=)
 
+set_target_properties(soundstone PROPERTIES CXX_VISIBILITY_PRESET hidden)
+
 generate_export_header(soundstone
     BASE_NAME SOUNDSTONE
     EXPORT_FILE_NAME "${PROJECT_BINARY_DIR}/include/soundstone/export.h"

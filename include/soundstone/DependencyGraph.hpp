@@ -3,11 +3,12 @@
 #include <memory>
 #include <unordered_map>
 #include "Sampler.hpp"
+#include <soundstone/export.h>
 
 namespace soundstone {
 
     template <typename T>
-    class GraphNode {
+    class SOUNDSTONE_EXPORT GraphNode {
     public:
         T *data;
         std::vector<std::weak_ptr<GraphNode<T>>> inputs;

@@ -7,11 +7,11 @@
 #include <thread>
 #include <mutex>
 #include <unordered_set>
+#include <soundstone/export.h>
 
 namespace soundstone {
 
-
-    class AudioProcessor {
+    class SOUNDSTONE_EXPORT AudioProcessor {
         size_t _sampler_buffer_length;
         std::vector<Sampler *> _samplers;
         std::vector<std::unique_ptr<SamplerWorker>> _workers;

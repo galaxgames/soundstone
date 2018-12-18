@@ -2,15 +2,17 @@
 #include <cubeb/cubeb.h>
 #include <mutex>
 #include "RingBuffer.hpp"
+#include <soundstone/export.h>
 
 namespace soundstone {
-    class AudioSystem {
-        cubeb *_cubeb;
-        cubeb_stream *_stream;
-        cubeb_state _state;
+
+    class SOUNDSTONE_EXPORT AudioSystem {
+        cubeb *_cubeb = nullptr;
+        cubeb_stream *_stream = nullptr;
+        cubeb_state _state = {};
         std::mutex _data_mutex;
-        unsigned int _sample_rate;
-        unsigned int _latency;
+        unsigned int _sample_rate = 0;
+        unsigned int _latency = 0;
         RingBuffer<float> _data;
 
         void move_internal(AudioSystem &&other) noexcept;

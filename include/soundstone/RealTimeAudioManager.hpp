@@ -2,10 +2,11 @@
 #include "AudioProcessor.hpp"
 #include "AudioSystem.hpp"
 #include <cstddef>
+#include <soundstone/export.h>
 
 namespace soundstone {
 
-    class RealTimeAudioManager {
+    class SOUNDSTONE_EXPORT RealTimeAudioManager {
         std::size_t _min_buffer_length;
         std::size_t _max_buffer_length;
         AudioSystem *_system;

@@ -6,12 +6,13 @@
 #include <condition_variable>
 #include <mutex>
 #include <memory>
+#include <soundstone/export.h>
 
 namespace soundstone {
 
     class SamplerWorker;
 
-    class Semaphore {
+    class SOUNDSTONE_EXPORT Semaphore {
         std::vector<SamplerWorker *> _free_workers;
         std::condition_variable _cv;
         std::mutex _mutex;

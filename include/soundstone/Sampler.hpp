@@ -1,8 +1,10 @@
 #pragma once
 #include <cstddef>
+#include <soundstone/export.h>
 
 namespace soundstone {
-    class Sampler {
+
+    class SOUNDSTONE_EXPORT Sampler {
     public:
         virtual ~Sampler() = default;
 

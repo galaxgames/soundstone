@@ -7,7 +7,6 @@ using namespace std;
 
 AudioSystem::AudioSystem() {
     cubeb_init(&_cubeb, nullptr, nullptr);
-    _stream = nullptr;
     _state = CUBEB_STATE_ERROR;
     if (!init_cubeb()) {
         destroy_cubeb();
