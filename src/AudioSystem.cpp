@@ -14,14 +14,12 @@ AudioSystem::AudioSystem() {
 }
 
 void AudioSystem::move_internal(AudioSystem &&other) noexcept {
-    _cubeb = other._cubeb;
-    _stream = other._stream;
-    _state = other._state;
-    _sample_rate = other._sample_rate;
-    _latency = other._latency;
-    _data = move(other._data);
-    other._cubeb = nullptr;
-    other._stream = nullptr;
+    swap(_cubeb, other._cubeb);
+    swap(_stream, other._stream);
+    swap(_state , other._state);
+    swap(_sample_rate, other._sample_rate);
+    swap(_latency, other._latency);
+    swap(_data, other._data);
 }
 
 AudioSystem::AudioSystem(AudioSystem &&other) noexcept {
@@ -72,11 +70,7 @@ bool AudioSystem::init_cubeb() {
     }
 
     rv = cubeb_stream_start(_stream);
-    if (rv != CUBEB_OK) {
-        return false;
-    }
-
-    return true;
+    return rv == CUBEB_OK;
 }
 
 void AudioSystem::destroy_cubeb() {
@@ -131,11 +125,11 @@ bool AudioSystem::is_stream_drained() const {
     return _state == CUBEB_STATE_DRAINED;
 }
 
-size_t AudioSystem::samples_buffered() const {
+uint32_t AudioSystem::samples_buffered() const {
     return _data.size();
 }
 
-unsigned int AudioSystem::sample_rate() const {
+uint32_t AudioSystem::sample_rate() const {
     return _sample_rate;
 }
 

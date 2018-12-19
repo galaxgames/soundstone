@@ -10,11 +10,10 @@ namespace soundstone {
     template <typename T>
     class SOUNDSTONE_EXPORT GraphNode {
     public:
-        T *data;
+        T *data = nullptr;
         std::vector<std::weak_ptr<GraphNode<T>>> inputs;
-        int order_list_index;
-        int dependency_index;
-        GraphNode();
+        int order_list_index = 0;
+        int dependency_index = 0;
     };
 
     template <typename T>

@@ -5,11 +5,10 @@
 namespace soundstone {
     template <typename T>
     class SOUNDSTONE_TESTABLE_EXPORT RingBuffer {
-        size_t _capacity;
-        size_t _size;
-        size_t _start_offset;
-        T *_buffer;
-
+        size_t _capacity = 0;
+        size_t _size = 0;
+        size_t _start_offset = 0;
+        T *_buffer = nullptr;
 
     public:
         RingBuffer();

@@ -1,21 +1,21 @@
 #pragma once
 #include <soundstone/Sampler.hpp>
+#include <cstdint>
 
 namespace soundstone_example {
     class SquareSampler : public soundstone::Sampler {
         float _frequency;
         float _amplitude;
-        unsigned int _samples_per_cycle;
-        unsigned int _i;
+        uint32_t _samples_per_cycle;
+        uint32_t _i;
     public:
-        explicit SquareSampler(float frequency);
-        void setup(unsigned int sample_rate) override;
+        SquareSampler(float frequency, uint32_t sample_rate);
         void commit() override;
-        size_t sample(
+        uint32_t sample(
             const float **input_data,
             float *output_data,
-            size_t input_count,
-            size_t nsamples
+            uint32_t input_count,
+            uint32_t nsamples
         ) override;
         void set_amplitude(float amplitude);
     };

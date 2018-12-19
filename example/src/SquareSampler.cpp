@@ -4,27 +4,24 @@ using namespace soundstone;
 using namespace soundstone_example;
 using namespace std;
 
-SquareSampler::SquareSampler(float frequency) {
+SquareSampler::SquareSampler(float frequency, uint32_t sample_rate) {
     _i = 0;
     _frequency = frequency;
     _amplitude = 1;
-}
-
-void SquareSampler::setup(unsigned int sample_rate) {
-    _samples_per_cycle = sample_rate / static_cast<unsigned int>(_frequency);
+    _samples_per_cycle = static_cast<uint32_t>(sample_rate / _frequency);
 }
 
 void SquareSampler::commit() {
 
 }
 
-size_t SquareSampler::sample(
+uint32_t SquareSampler::sample(
     const float **input_data,
     float *output_data,
-    size_t input_count,
-    size_t nsamples
+    uint32_t input_count,
+    uint32_t nsamples
 ) {
-    for (size_t i = 0; i < nsamples; ++i) {
+    for (uint32_t i = 0; i < nsamples; ++i) {
         output_data[i] = ((_i / (_samples_per_cycle / 2)) % 2 ? 1.0f : -1.0f) * _amplitude;
         _i = (_i + 1) % _samples_per_cycle;
     }

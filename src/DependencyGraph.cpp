@@ -7,10 +7,6 @@ using namespace soundstone;
 using namespace std;
 
 template <typename T>
-GraphNode<T>::GraphNode() {
-}
-
-template <typename T>
 DependencyGraph<T>::DependencyGraph() {
 }
 

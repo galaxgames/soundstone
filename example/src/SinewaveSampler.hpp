@@ -3,21 +3,19 @@
 
 namespace soundstone_example {
     class SinewaveSampler : public soundstone::Sampler {
-        unsigned int _frequency;
-        unsigned int _sample_rate;
-        unsigned int _samples_per_cycle;
-        size_t _i;
+        uint32_t _frequency;
+        uint32_t _samples_per_cycle;
+        uint32_t _i;
         std::unique_ptr<float[]> _samples;
 
     public:
-        explicit SinewaveSampler(unsigned int frequency);
-        void setup(unsigned int sample_rate) override;
+        SinewaveSampler(uint32_t frequency, uint32_t sample_rate);
         void commit() override;
-        size_t sample(
+        uint32_t sample(
             const float **input_data,
             float *output_data,
-            size_t input_count,
-            size_t nsamples
+            uint32_t input_count,
+            uint32_t nsamples
         ) override;
     };
 }

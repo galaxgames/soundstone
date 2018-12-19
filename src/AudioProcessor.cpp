@@ -8,36 +8,7 @@ using namespace std;
 
 
 AudioProcessor::AudioProcessor() {
-    _sampler_buffer_length = 0;
-    _is_graph_dirty = true;
     setup_workers(1);
-}
-
-void AudioProcessor::move_internal(AudioProcessor &&other) noexcept {
-    _sampler_buffer_length = other._sampler_buffer_length;
-    _samplers = move(other._samplers);
-    _workers = move(other._workers);
-    _threads = move(other._threads);
-    _sampler_buffers = move(other._sampler_buffers);
-    _semaphore = move(other._semaphore);
-    _sampler_graph = move(other._sampler_graph);
-    _ordered_samplers = move(other._ordered_samplers);
-    _is_graph_dirty = other._is_graph_dirty;
-    _sample_rate = other._sample_rate;
-
-    other._sampler_buffer_length = 0;
-    other._is_graph_dirty = true;
-}
-
-AudioProcessor::AudioProcessor(AudioProcessor &&other) noexcept {
-    assert(&other != this);
-    move_internal(move(other));
-}
-
-AudioProcessor &AudioProcessor::operator=(AudioProcessor &&other) noexcept {
-    assert(&other != this);
-    move_internal(move(other));
-    return *this;
 }
 
 AudioProcessor::~AudioProcessor() {
@@ -45,7 +16,7 @@ AudioProcessor::~AudioProcessor() {
     setup_workers(0);
 }
 
-void AudioProcessor::setup_workers(size_t count) {
+void AudioProcessor::setup_workers(uint32_t count) {
     assert(_workers.size() == _threads.size());
     if (_workers.size() < count) {
         _workers.reserve(count);
@@ -76,7 +47,6 @@ void AudioProcessor::setup_workers(size_t count) {
 
 void AudioProcessor::add_sampler(Sampler *sampler) {
     _samplers.push_back(sampler);
-    sampler->setup(_sample_rate);
     _sampler_graph.add(sampler);
     _is_graph_dirty = true;
 }
@@ -109,9 +79,10 @@ enum class SamplerWorkStatus {
     Done
 };
 
-void AudioProcessor::update(float *data, size_t nsamples) {
+void AudioProcessor::update(float *data, uint32_t nsamples) {
     // Early out if we have no root samplers
     if (_sampler_graph.root().inputs.empty()) {
+        fill_n(data, nsamples, 0);
         return;
     }
 
@@ -239,26 +210,19 @@ void AudioProcessor::update(float *data, size_t nsamples) {
     }
 
     const GraphNode<Sampler> &root = _sampler_graph.root();
-    for (size_t i = 0, ilen = root.inputs.size(); i < ilen; ++i) {
-        const GraphNode<Sampler> *right_node = root.inputs[i].lock().get();
+    for (const auto &input : root.inputs) {
+        const GraphNode<Sampler> *right_node = input.lock().get();
         float *right_buffer = _sampler_buffers[right_node->order_list_index].get();
         mix(data, right_buffer, nsamples);
     }
 }
 
-void AudioProcessor::set_thread_count(size_t count) {
+void AudioProcessor::set_thread_count(uint32_t count) {
     assert(count > 0);
     setup_workers(count);
 }
 
-void AudioProcessor::set_sample_rate(unsigned int sample_rate) {
-    _sample_rate = sample_rate;
-    for (Sampler *sampler : _samplers) {
-        sampler->setup(sample_rate);
-    }
-}
-
-void AudioProcessor::mix(float *a, const float *b, size_t count) {
+void AudioProcessor::mix(float *a, const float *b, uint32_t count) {
     for (size_t i = 0; i < count; ++i) {
         float sample_a = a[i];
         float sample_b = b[i];

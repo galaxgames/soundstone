@@ -11,8 +11,8 @@ namespace soundstone {
         cubeb_stream *_stream = nullptr;
         cubeb_state _state = {};
         std::mutex _data_mutex;
-        unsigned int _sample_rate = 0;
-        unsigned int _latency = 0;
+        uint32_t _sample_rate = 0;
+        uint32_t _latency = 0;
         RingBuffer<float> _data;
 
         void move_internal(AudioSystem &&other) noexcept;
@@ -40,8 +40,8 @@ namespace soundstone {
         bool is_steam_ok() const;
         bool is_stream_playing() const;
         bool is_stream_drained() const;
-        size_t samples_buffered() const;
-        unsigned int sample_rate() const;
+        uint32_t samples_buffered() const;
+        uint32_t sample_rate() const;
 
         void update(const float *data, size_t sample_count);
 

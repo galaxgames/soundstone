@@ -12,7 +12,7 @@
 namespace soundstone {
 
     class SOUNDSTONE_EXPORT AudioProcessor {
-        size_t _sampler_buffer_length;
+        uint32_t _sampler_buffer_length = 0;
         std::vector<Sampler *> _samplers;
         std::vector<std::unique_ptr<SamplerWorker>> _workers;
         std::vector<std::thread> _threads;
@@ -20,27 +20,24 @@ namespace soundstone {
         Semaphore _semaphore;
         DependencyGraph<Sampler> _sampler_graph;
         std::vector<GraphNode<Sampler> *> _ordered_samplers;
-        bool _is_graph_dirty;
-        unsigned int _sample_rate;
+        bool _is_graph_dirty = true;
 
-        void move_internal(AudioProcessor &&other) noexcept;
-        void setup_workers(size_t count);
-        void mix(float *a, const float *b, size_t size);
+        void setup_workers(uint32_t count);
+        void mix(float *a, const float *b, uint32_t size);
 
     public:
         AudioProcessor();
         AudioProcessor(const AudioProcessor &) = delete;
-        AudioProcessor(AudioProcessor &&) noexcept;
+        AudioProcessor(AudioProcessor &&) noexcept = default;
         ~AudioProcessor();
         AudioProcessor &operator=(const AudioProcessor &) = delete;
-        AudioProcessor &operator=(AudioProcessor &&) noexcept;
+        AudioProcessor &operator=(AudioProcessor &&) noexcept = default;
 
         void add_sampler(Sampler *sampler);
         void route_sampler(Sampler *sampler, Sampler *target);
         void route_sampler_to_root(Sampler *sampler);
         void remove_sampler(Sampler *sampler);
-        void update(float *data, size_t nsamples);
-        void set_sample_rate(unsigned int sample_rate);
-        void set_thread_count(size_t count);
+        void update(float *data, uint32_t nsamples);
+        void set_thread_count(uint32_t count);
     };
 }

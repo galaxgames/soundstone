@@ -7,11 +7,11 @@ namespace soundstone_test {
     public:
         MOCK_METHOD1(setup, void(unsigned int sample_rate));
         MOCK_METHOD0(commit, void());
-        MOCK_METHOD4(sample, size_t(
+        MOCK_METHOD4(sample, uint32_t(
             const float **input_data,
             float *output_data,
-            size_t input_count,
-            size_t nsamples
+            uint32_t input_count,
+            uint32_t nsamples
         ));
     };
 }

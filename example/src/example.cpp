@@ -17,14 +17,15 @@ typedef chrono::duration<double> dseconds;
 int main(int argc, char **argv) {
     AudioProcessor processor;
     AudioSystem system;
-    SinewaveSampler sampler1(540);
-    SinewaveSampler sampler2(440);
-    SinewaveSampler sampler3(340);
-    SinewaveSampler sampler4(240);
-    SquareSampler square1(540);
-    SquareSampler square2(440);
-    SquareSampler square3(340);
-    SquareSampler square4(240);
+
+    SinewaveSampler sampler1(540, system.sample_rate());
+    SinewaveSampler sampler2(440, system.sample_rate());
+    SinewaveSampler sampler3(340, system.sample_rate());
+    SinewaveSampler sampler4(240, system.sample_rate());
+    SquareSampler square1(540, system.sample_rate());
+    SquareSampler square2(440, system.sample_rate());
+    SquareSampler square3(340, system.sample_rate());
+    SquareSampler square4(240, system.sample_rate());
     processor.add_sampler(&sampler1);
     processor.add_sampler(&sampler2);
     processor.add_sampler(&sampler3);
@@ -50,9 +51,11 @@ int main(int argc, char **argv) {
 
     chrono::high_resolution_clock::time_point frame_start = chrono::high_resolution_clock::now();
 
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wmissing-noreturn"
     for (;;) {
         auto since_epoch = chrono::duration_cast<dseconds>(frame_start.time_since_epoch());
-        square1.set_amplitude(sin(since_epoch.count()));
+        square1.set_amplitude(sin(static_cast<float>(since_epoch.count())));
 
         // Simulate processing logic on main frame
         this_thread::sleep_for(chrono::duration<int, milli>(10));
@@ -63,5 +66,6 @@ int main(int argc, char **argv) {
         auto frame_duration_seconds = chrono::duration_cast<dseconds>(frame_duration);
         manager.update(frame_duration_seconds.count());
     }
+    #pragma clang diagnostic pop
 
 }

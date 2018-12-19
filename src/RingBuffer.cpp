@@ -7,12 +7,7 @@ using namespace soundstone;
 using namespace std;
 
 template <typename T>
-RingBuffer<T>::RingBuffer() {
-    _capacity = 0;
-    _size = 0;
-    _start_offset = 0;
-    _buffer = nullptr;
-}
+RingBuffer<T>::RingBuffer() = default;
 
 template <typename T>
 RingBuffer<T>::RingBuffer(const RingBuffer &other) {
