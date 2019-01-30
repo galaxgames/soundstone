@@ -1,14 +1,12 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.12)
 project(soundstone LANGUAGES CXX VERSION 0.1)
 
 include(GenerateExportHeader)
 include(CMakePackageConfigHelpers)
 
 enable_testing()
-find_package(GTest REQUIRED)
+find_package(GTest CONFIG REQUIRED)
 find_package(cubeb CONFIG REQUIRED)
-find_library(GMOCK_LIBRARY NAMES gmock)
-# find_library(CUBEB_LIBRARY NAMES cubeb)
 
 # Source files
 file(GLOB_RECURSE SOUNDSTONE_SOURCE_FILES
@@ -38,11 +36,8 @@ generate_export_header(soundstone
     EXPORT_FILE_NAME "${PROJECT_BINARY_DIR}/include/soundstone/testable_export.h"
 )
 
-set_target_properties(soundstone soundstone_testable soundstone_test
-    PROPERTIES
-        CXX_STANDARD 11
-        CXX_STANDARD_REQUIRED ON
-)
+target_compile_features(soundstone PUBLIC cxx_std_11)
+target_compile_features(soundstone_testable PUBLIC cxx_std_11)
 
 target_include_directories(soundstone
     PRIVATE
@@ -70,10 +65,10 @@ target_include_directories(soundstone_test
         $<BUILD_INTERFACE:${CMAKE_PREFIX_PATH}/include>
 )
 
-target_link_libraries(soundstone cubeb::cubeb)
-target_link_libraries(soundstone_testable cubeb::cubeb)
+target_link_libraries(soundstone PRIVATE cubeb::cubeb)
+target_link_libraries(soundstone_testable PRIVATE cubeb::cubeb)
 target_link_libraries(soundstone_test
-    GTest::GTest GTest::Main ${GMOCK_LIBRARY} soundstone_testable
+    GTest::gtest GTest::gtest_main GTest::gmock soundstone_testable
 )
 
 # Tests

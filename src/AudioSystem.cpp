@@ -1,9 +1,11 @@
 #include <soundstone/AudioSystem.hpp>
+
 #include <algorithm>
 #include <cassert>
 
 using namespace soundstone;
 using namespace std;
+
 
 AudioSystem::AudioSystem() {
     cubeb_init(&_cubeb, nullptr, nullptr);

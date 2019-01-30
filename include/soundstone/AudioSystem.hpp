@@ -1,8 +1,9 @@
 #pragma once
+#include <soundstone/export.h>
+#include "RingBuffer.hpp"
+
 #include <cubeb/cubeb.h>
 #include <mutex>
-#include "RingBuffer.hpp"
-#include <soundstone/export.h>
 
 namespace soundstone {
 
