@@ -1,37 +1,36 @@
 #pragma once
+#include <soundstone/export.h>
+#include "Module.hpp"
+
 #include <vector>
 #include <memory>
 #include <unordered_map>
-#include "Sampler.hpp"
-#include <soundstone/export.h>
+#include <unordered_set>
+
 
 namespace soundstone {
 
     template <typename T>
     class SOUNDSTONE_EXPORT GraphNode {
     public:
-        T *data = nullptr;
-        std::vector<std::weak_ptr<GraphNode<T>>> inputs;
-        int order_list_index = 0;
-        int dependency_index = 0;
+        T data = {};
+        std::unordered_set<T> dependencies;
     };
 
     template <typename T>
-    class DependencyGraph {
-        std::unordered_map<T *, std::shared_ptr<GraphNode<T>>> _nodes;
-        GraphNode<T> _root;
+    class SOUNDSTONE_EXPORT DependencyGraph {
+        std::unordered_map<T, GraphNode<T>> _nodes;
 
     public:
-        DependencyGraph();
+        void add(T data);
+        void remove(T data);
+        void add_dependency(T dependee, T dependency);
+        void remove_dependency(T dependee, T dependency);
+        void clear();
+        std::unique_ptr<T[]> resolve(uint32_t &count) const;
 
-        void add(T *data);
-        void remove(T *data);
-        void set_parent(T *child, T *parent);
-        void attach_to_root(T* parent);
-        void build(std::vector<GraphNode<T> *> &nodes);
-        const GraphNode<T>& root() const;
     };
 
-    extern template class GraphNode<Sampler>;
-    extern template class DependencyGraph<Sampler>;
+    extern template class GraphNode<uint32_t>;
+    extern template class DependencyGraph<uint32_t>;
 }

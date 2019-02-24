@@ -1,14 +1,13 @@
 #pragma once
-#include <soundstone/Sampler.hpp>
+#include <soundstone/Module.hpp>
 
 namespace soundstone_test {
-    class DumbSampler : public soundstone::Sampler {
+    class DumbSampler : public soundstone::Module {
     public:
         void commit() override;
-        uint32_t sample(
-            const float **input_data,
+        void sample(
+            const float * const *input_data,
             float *output_data,
-            uint32_t input_count,
             uint32_t nsamples
         ) override;
     };

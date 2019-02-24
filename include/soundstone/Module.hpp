@@ -5,9 +5,9 @@
 
 namespace soundstone {
 
-    class SOUNDSTONE_EXPORT Sampler {
+    class SOUNDSTONE_EXPORT Module {
     public:
-        virtual ~Sampler() = default;
+        virtual ~Module() = default;
 
         /**
          * @brief commit Called when sample is about to be called.
@@ -19,16 +19,13 @@ namespace soundstone {
 
         /**
          * @brief sample Generate samples
-         * @param input_buffers Data from samplers routed to output to this sampler.
-         * @param output_buffer Buffer to sample to.
-         * @param input_count   The count of buffers the input_buffers parameter points to.
+         * @param input_buffers Sample data from modules routed to this module.
+         * @param output_buffer Buffer to sample into.
          * @param nsamples      Length of the given buffers.
-         * @return              The count of samples actually generated.
          */
-        virtual uint32_t sample(
-            const float **input_buffers,
+        virtual void sample(
+            const float * const *input_buffers,
             float *output_buffer,
-            uint32_t input_count,
             uint32_t nsamples
         ) = 0;
     };

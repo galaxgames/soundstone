@@ -1,13 +1,12 @@
-#include "SinewaveSampler.hpp"
+#include "SinewaveGenerator.hpp"
 #include <cmath>
 
 using namespace soundstone_example;
 using namespace soundstone;
 using namespace std;
 
-SinewaveSampler::SinewaveSampler(uint32_t frequency, uint32_t sample_rate) {
+SinewaveGenerator::SinewaveGenerator(uint32_t frequency, uint32_t sample_rate) {
     _frequency = frequency;
-    _i = 0;
 
     _samples_per_cycle = sample_rate / _frequency;
     _samples = unique_ptr<float[]>(new float[_samples_per_cycle]);
@@ -17,19 +16,21 @@ SinewaveSampler::SinewaveSampler(uint32_t frequency, uint32_t sample_rate) {
     }
 }
 
-void SinewaveSampler::commit() {
+void SinewaveGenerator::commit() {
 
 }
 
-uint32_t SinewaveSampler::sample(
-    const float **input_data,
+void SinewaveGenerator::sample(
+    const float * const *input_data,
     float *output_data,
-    uint32_t input_count,
     uint32_t nsamples
 ) {
     for (size_t i = 0; i < nsamples; ++i) {
-        output_data[i] = _samples[_i];
+        output_data[i] = _samples[_i] * _amplitude;
         _i = (_i + 1) % _samples_per_cycle;
     }
-    return nsamples;
+}
+
+void SinewaveGenerator::set_amplitude(float amplitude) {
+    _amplitude = amplitude;
 }

@@ -1,7 +1,9 @@
+#include <soundstone/AudioProcessor.hpp>
+
+#include "mocks/MockSampler.hpp"
+
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <soundstone/AudioProcessor.hpp>
-#include "mocks/MockSampler.hpp"
 #include <memory>
 
 using namespace soundstone;
@@ -9,50 +11,53 @@ using namespace soundstone_test;
 using namespace testing;
 using namespace std;
 
+class AudioProcessorTests : public TestWithParam<uint32_t> {
+
+};
+
+
 TEST(AudioProcessorTests, TestConstructDestruct)
 {
     AudioProcessor processor;
 }
 
-TEST(AudioProcessorTests, TestUpdateWithZeroSamplers)
+TEST_P(AudioProcessorTests, TestUpdateWithZeroSamplers)
 {
     AudioProcessor processor;
-    auto buff = unique_ptr<float[]>(new float[1024]);
-    processor.update(buff.get(), 1024);
+    processor.set_thread_count(GetParam());
+    processor.update(1024);
 }
 
-TEST(AudioProcessorTests, TestRemoveSampler)
+TEST_P(AudioProcessorTests, TestRemovedSamplerAreNotCalled)
 {
     NiceMock<MockSampler> sampler1, sampler2;
     AudioProcessor processor;
-    auto buff = unique_ptr<float[]>(new float[1]);
+    processor.set_thread_count(GetParam());
 
-    EXPECT_CALL(sampler1, sample(_, NotNull(), 0, 1)).Times(1);
-    EXPECT_CALL(sampler2, sample(_, NotNull(), _, _)).Times(0);
+    EXPECT_CALL(sampler1, sample(NotNull(), NotNull(), 1)).Times(1);
+    EXPECT_CALL(sampler2, sample(NotNull(), NotNull(), _)).Times(0);
 
-    processor.add_sampler(&sampler1);
-    processor.add_sampler(&sampler2);
-    processor.route_sampler_to_root(&sampler1);
-    processor.route_sampler_to_root(&sampler2);
-    processor.remove_sampler(&sampler2);
-    processor.update(buff.get(), 1);
+    processor.add_module(&sampler1);
+    processor.add_module(&sampler2);
+    processor.set_input(&sampler1, 0, &sampler2);
+    processor.remove_module(&sampler2);
+    processor.update(1);
 }
 
-TEST(AudioProcessorTests, TestSimpleRouting)
+TEST_P(AudioProcessorTests, TestSimpleRoutingWorks)
 {
-    // Sampler 1 -> Sampler 2 -> root
+    // Module 1 -> Module 2
     NiceMock<MockSampler> sampler1, sampler2;
-    AudioProcessor system;
-    auto buff = unique_ptr<float[]>(new float[1]);
+    AudioProcessor processor;
+    processor.set_thread_count(GetParam());
 
-    EXPECT_CALL(sampler1, sample(_, NotNull(), 0, 1)).WillOnce(DoAll(SetArgPointee<1>(1.0f), Return(1)));
-    EXPECT_CALL(sampler2, sample(Pointee(Pointee(1)), NotNull(), 1, 1)).Times(1);
+    EXPECT_CALL(sampler1, sample(Pointee(NotNull()), NotNull(), 1)).WillOnce(DoAll(SetArgPointee<1>(1.0f)));
+    EXPECT_CALL(sampler2, sample(Pointee(Pointee(1.0f)), NotNull(), 1)).Times(1);
 
-    system.add_sampler(&sampler1);
-    system.add_sampler(&sampler2);
-    system.route_sampler(&sampler1, &sampler2);
-    system.route_sampler_to_root(&sampler2);
-    system.update(buff.get(), 1);
+    processor.add_module(&sampler1);
+    processor.add_module(&sampler2);
+    processor.set_input(&sampler2, 0, &sampler1);
+    processor.update(1);
 }
 
 MATCHER_P2(PointeeAtIndex, n, m, "") {
@@ -77,60 +82,70 @@ MATCHER_P3(AllPointeesAtIndices, from, to, m, "") {
     return true;
 }
 
-TEST(AudioProcessorTests, TestRoutingMultipleInputs)
+TEST_P(AudioProcessorTests, TestRoutingMultipleInputsToSamplerWithDifferentInputIndices)
 {
-    // Sampler 1 - Sampler 3 -> root
+    // Module 1 - Module 3
     //           /
-    // Sampler 2
+    // Module 2
     NiceMock<MockSampler> sampler1, sampler2, sampler3;
-    AudioProcessor system;
-    auto buff = unique_ptr<float[]>(new float[1]);
+    AudioProcessor processor;
+    processor.set_thread_count(GetParam());
 
-    EXPECT_CALL(sampler1, sample(_, NotNull(), 0, 1)).WillOnce(DoAll(SetArgPointee<1>(1.0f), Return(1)));
-    EXPECT_CALL(sampler2, sample(_, NotNull(), 0, 1)).WillOnce(DoAll(SetArgPointee<1>(2.0f), Return(1)));
+    EXPECT_CALL(sampler1, sample(_, NotNull(), 1)).WillOnce(DoAll(SetArgPointee<1>(1.0f)));
+    EXPECT_CALL(sampler2, sample(_, NotNull(), 1)).WillOnce(DoAll(SetArgPointee<1>(2.0f)));
     EXPECT_CALL(sampler3, sample(
-        AnyPointeeAtIndices(0, 2, AnyOf(Pointee(1.0f), Pointee(2.0f))),
-        NotNull(), 2, 1
+        AllOf(PointeeAtIndex(0, Pointee(1.0f)), PointeeAtIndex(1, Pointee(2.0f))), NotNull(), 1
     )).Times(1);
 
-    system.add_sampler(&sampler1);
-    system.add_sampler(&sampler2);
-    system.add_sampler(&sampler3);
-    system.route_sampler(&sampler1, &sampler3);
-    system.route_sampler(&sampler2, &sampler3);
-    system.route_sampler_to_root(&sampler3);
-    system.update(buff.get(), 1);
+    processor.add_module(&sampler1);
+    processor.add_module(&sampler2);
+    processor.add_module(&sampler3);
+    processor.set_input(&sampler3, 0, &sampler1);
+    processor.set_input(&sampler3, 1, &sampler2);
+    processor.update(1);
 }
 
-TEST(AudioProcessorTests, TestRoutingDiamond)
+TEST_P(AudioProcessorTests, TestRoutingDiamondWorks)
 {
-    //             Sampler 2
-    // Sampler 1 <           > root
-    //             Sampler 3
+    //             Module 2
+    // Module 1 <           > root
+    //             Module 3
     NiceMock<MockSampler> sampler1, sampler2, sampler3, sampler4;
-    AudioProcessor system;
+    AudioProcessor processor;
+    processor.set_thread_count(GetParam());
     auto buff = unique_ptr<float[]>(new float[1]);
 
-    EXPECT_CALL(sampler1, sample(_, NotNull(), 0, 1)).WillOnce(DoAll(SetArgPointee<1>(1.0f), Return(1)));
+    EXPECT_CALL(sampler1, sample(
+        NotNull(), NotNull(), 1
+    )).Times(1).WillOnce(DoAll(SetArgPointee<1>(1.0f)));
+
     EXPECT_CALL(sampler2, sample(
-        Pointee(Pointee(1.0f)), NotNull(), 1, 1
-    )).WillOnce(DoAll(SetArgPointee<1>(2.0f), Return(1)));
+        PointeeAtIndex(0, Pointee(1.0f)), NotNull(), 1
+    )).Times(1).WillOnce(DoAll(SetArgPointee<1>(2.0f)));
+
     EXPECT_CALL(sampler3, sample(
-        Pointee(Pointee(1.0f)), NotNull(), 1, 1
-    )).WillOnce(DoAll(SetArgPointee<1>(3.0f), Return(1)));
+        PointeeAtIndex(0, Pointee(1.0f)), NotNull(), 1
+    )).Times(1).WillOnce(DoAll(SetArgPointee<1>(3.0f)));
+
     EXPECT_CALL(sampler4, sample(
-        AnyPointeeAtIndices(0, 2, AnyOf(Pointee(2.0f), Pointee(3.0f))),
-        NotNull(), 2, 1
+        AllOf(PointeeAtIndex(0, Pointee(2.0f)), PointeeAtIndex(1, Pointee(3.0))),
+        NotNull(),
+        1
     )).Times(1);
 
-    system.add_sampler(&sampler1);
-    system.add_sampler(&sampler2);
-    system.add_sampler(&sampler3);
-    system.add_sampler(&sampler4);
-    system.route_sampler(&sampler1, &sampler2);
-    system.route_sampler(&sampler1, &sampler3);
-    system.route_sampler(&sampler2, &sampler4);
-    system.route_sampler(&sampler3, &sampler4);
-    system.route_sampler_to_root(&sampler4);
-    system.update(buff.get(), 1);
+    processor.add_module(&sampler1);
+    processor.add_module(&sampler2);
+    processor.add_module(&sampler3);
+    processor.add_module(&sampler4);
+    processor.set_input(&sampler4, 0, &sampler2);
+    processor.set_input(&sampler4, 1, &sampler3);
+    processor.set_input(&sampler2, 0, &sampler1);
+    processor.set_input(&sampler3, 0, &sampler1);
+    processor.update(1);
 }
+
+
+INSTANTIATE_TEST_SUITE_P(
+    AudioProcessorTestsImpl,
+    AudioProcessorTests,
+    ::testing::Values(1, 2, 3, 4));

@@ -1,5 +1,5 @@
 #pragma once
-#include "Sampler.hpp"
+#include "Module.hpp"
 #include "DependencyGraph.hpp"
 #include <cstddef>
 #include <vector>
@@ -31,7 +31,7 @@ namespace soundstone {
         std::condition_variable _cv;
         std::mutex _mutex;
         std::unique_lock<std::mutex> _lock;
-        const GraphNode<Sampler> *_sampler_node;
+        const GraphNode<Module> *_sampler_node;
         std::unique_ptr<const float *[]> _input_buffers;
         float *_output_buffer;
         Semaphore *_semaphore;
@@ -45,14 +45,14 @@ namespace soundstone {
         void setup(
             const float **input_buffers,
             float *output_buffer,
-            const GraphNode<Sampler> *sampler_node,
+            const GraphNode<Module> *sampler_node,
             size_t input_count,
             size_t buffer_length,
             Semaphore *semaphore
         );
         void process();
         void stop();
-        const GraphNode<Sampler> *sampler_node() const;
+        const GraphNode<Module> *sampler_node() const;
     };
 
 }

@@ -1,71 +1,71 @@
-#include <soundstone/AudioSystem.hpp>
+#include "SinewaveGenerator.hpp"
+#include "SquareGenerator.hpp"
+#include "Mixer.hpp"
+
+#include <soundstone/SystemAudio.hpp>
 #include <soundstone/AudioProcessor.hpp>
 #include <soundstone/RealTimeAudioManager.hpp>
-#include "SinewaveSampler.hpp"
-#include "SquareSampler.hpp"
+#include <soundstone/SystemOutputModule.hpp>
+#include <soundstone/ThreadedDriver.hpp>
+
 #include <thread>
 #include <iostream>
 #include <chrono>
 #include <cmath>
 
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
+
+
 using namespace soundstone;
 using namespace soundstone_example;
 using namespace std;
+using namespace std::chrono;
 
-typedef chrono::duration<double> dseconds;
 
 int main(int argc, char **argv) {
     AudioProcessor processor;
-    AudioSystem system;
+    SystemAudio system;
 
-    SinewaveSampler sampler1(540, system.sample_rate());
-    SinewaveSampler sampler2(440, system.sample_rate());
-    SinewaveSampler sampler3(340, system.sample_rate());
-    SinewaveSampler sampler4(240, system.sample_rate());
-    SquareSampler square1(540, system.sample_rate());
-    SquareSampler square2(440, system.sample_rate());
-    SquareSampler square3(340, system.sample_rate());
-    SquareSampler square4(240, system.sample_rate());
-    processor.add_sampler(&sampler1);
-    processor.add_sampler(&sampler2);
-    processor.add_sampler(&sampler3);
-    processor.add_sampler(&sampler4);
-    processor.add_sampler(&square1);
-    processor.add_sampler(&square2);
-    processor.add_sampler(&square3);
-    processor.add_sampler(&square4);
+    SystemOutputModule output(&system);
+    SinewaveGenerator sin(540, system.sample_rate());
+    SquareGenerator square(540, system.sample_rate());
+    square.set_amplitude(0.25f);
+    Mixer mixer;
 
-    processor.route_sampler_to_root(&sampler1);
-    processor.route_sampler_to_root(&sampler2);
-    processor.route_sampler_to_root(&sampler3);
-    processor.route_sampler_to_root(&sampler4);
-    processor.route_sampler_to_root(&square1);
-    processor.route_sampler_to_root(&square2);
-    processor.route_sampler_to_root(&square3);
-    processor.route_sampler_to_root(&square4);
+    processor.add_module(&output);
+    processor.add_module(&sin);
+    processor.add_module(&square);
+    processor.add_module(&mixer);
 
-    processor.set_thread_count(4);
-    RealTimeAudioManager manager(&processor, &system);
+    processor.route(&sin).to(&mixer, 0);
+    processor.route(&square).to(&mixer, 1);
+    processor.route(&mixer).to(&output);
 
-    manager.update(1.0 / 60.0);
+    processor.set_thread_count(1);
 
-    chrono::high_resolution_clock::time_point frame_start = chrono::high_resolution_clock::now();
+    uint32_t underflows = 0;
 
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wmissing-noreturn"
-    for (;;) {
-        auto since_epoch = chrono::duration_cast<dseconds>(frame_start.time_since_epoch());
-        square1.set_amplitude(sin(static_cast<float>(since_epoch.count())));
+    system.set_drained_callback([&]{ ++underflows; });
 
-        // Simulate processing logic on main frame
-        this_thread::sleep_for(chrono::duration<int, milli>(10));
+    const uint32_t driver_latency = 512;
 
-        auto now = chrono::high_resolution_clock::now();
-        auto frame_duration = now - frame_start;
-        frame_start = now;
-        auto frame_duration_seconds = chrono::duration_cast<dseconds>(frame_duration);
-        manager.update(frame_duration_seconds.count());
+    cout << "=== Soundstone Example ===" << endl;
+    cout << "Sample Rate: " << system.sample_rate() << endl;
+    cout << "System Audio Latency: " << system.latency() << endl;
+    cout << "Driver Latency: " << driver_latency << endl;
+
+    ThreadedDriver driver(&processor, &system);
+    driver.set_latency_samples(driver_latency);
+    driver.start();
+
+    while (true) {
+        cout << "\r" << "Samples Buffered: " << system.samples_buffered() << ", Underflows: " << underflows;
+        cout.flush();
+        this_thread::sleep_for(milliseconds(250));
     }
-    #pragma clang diagnostic pop
-
 }
+
+
+#pragma clang diagnostic pop
