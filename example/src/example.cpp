@@ -4,7 +4,6 @@
 
 #include <soundstone/SystemAudio.hpp>
 #include <soundstone/AudioProcessor.hpp>
-#include <soundstone/RealTimeAudioManager.hpp>
 #include <soundstone/SystemOutputModule.hpp>
 #include <soundstone/ThreadedDriver.hpp>
 
